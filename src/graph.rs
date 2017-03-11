@@ -62,11 +62,38 @@ pub struct Node {
     out_ctrl: Box<[f32]>,
 }
 
+pub trait IntoBoxedSlice<T> {
+    fn into_box(self) -> Box<[T]>;
+}
+
+impl<T> IntoBoxedSlice<T> for Vec<T> {
+    fn into_box(self) -> Box<[T]> { self.into_boxed_slice() }
+}
+
+impl<T> IntoBoxedSlice<T> for Box<[T]> {
+    fn into_box(self) -> Box<[T]> { self }
+}
+
+impl<'a, T: Clone> IntoBoxedSlice<T> for &'a [T] {
+    fn into_box(self) -> Box<[T]> {
+        let vec: Vec<T> = From::from(self);
+        vec.into_boxed_slice()
+    }
+}
+
+impl<T> IntoBoxedSlice<T> for [T; 0] {
+    fn into_box(self) -> Box<[T]> { Vec::new().into_boxed_slice() }
+}
+
+impl<T: Clone> IntoBoxedSlice<T> for [T; 1] {
+    fn into_box(self) -> Box<[T]> { self[..].into_box() }
+}
+
 impl Node {
     /// Create a new node. The index must be given, as well as the input wiring.
-    // TODO: should we take Vec instead of boxed slice?
-    pub fn create(module: Box<Module>, ix: usize, in_buf_wiring: Box<[(usize, usize)]>,
-        in_ctrl_wiring: Box<[(usize, usize)]>) -> Node
+    pub fn create<B1: IntoBoxedSlice<(usize, usize)>,
+                  B2: IntoBoxedSlice<(usize, usize)>>
+        (module: Box<Module>, ix: usize, in_buf_wiring: B1, in_ctrl_wiring: B2) -> Node
     {
         let n_bufs = module.n_bufs_out();
         let mut out_bufs = Vec::with_capacity(n_bufs);
@@ -78,8 +105,8 @@ impl Node {
         Node {
             ix: ix,
             module: module,
-            in_buf_wiring: in_buf_wiring,
-            in_ctrl_wiring: in_ctrl_wiring,
+            in_buf_wiring: in_buf_wiring.into_box(),
+            in_ctrl_wiring: in_ctrl_wiring.into_box(),
             out_bufs: out_bufs,
             out_ctrl: out_ctrl,
         }

@@ -27,25 +27,21 @@ use worker::Worker;
 use graph::Node;
 use module::N_SAMPLES_PER_CHUNK;
 
-fn empty_box<T>() -> Box<[T]> {
-    Vec::new().into_boxed_slice()
-}
-
 fn main() {
     let (mut worker, tx, rx) = Worker::create(1024);
     let module = Box::new(modules::sin::Sin::new(440.0 / 44_100.0));
-    let node = Node::create(module, 1, empty_box(), empty_box());
+    let node = Node::create(module, 1, [], []);
     worker.handle_node(node);
     let module = Box::new(modules::sin::Sin::new(880.0 / 44_100.0));
-    let node = Node::create(module, 2, empty_box(), empty_box());
+    let node = Node::create(module, 2, [], []);
     worker.handle_node(node);
     let module = Box::new(modules::sum::Sum);
-    let node = Node::create(module, 0, vec![(1, 0), (2, 0)].into_boxed_slice(), empty_box());
+    let node = Node::create(module, 0, vec![(1, 0), (2, 0)], []);
     worker.handle_node(node);
     let _audio_unit = run(worker).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(1_000));
     let module = Box::new(modules::sin::Sin::new(440.0 * 1.5 / 44_100.0));
-    let node = Node::create(module, 2, empty_box(), empty_box());
+    let node = Node::create(module, 2, [], []);
     tx.send(node);
     std::thread::sleep(std::time::Duration::from_millis(1_000));
 }
