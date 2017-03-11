@@ -12,12 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod queue;
-mod graph;
-mod module;
-mod modules;
-mod worker;
+//! A simple module that just sums the inputs.
 
-fn main() {
-    queue::main();
+use module::{Module, Buffer};
+
+pub struct Sum;
+
+impl Module for Sum {
+    fn n_bufs_out(&self) -> usize { 1 }
+
+    fn process(&mut self, _control_in: &[f32], _control_out: &mut [f32],
+        buf_in: &[&Buffer], buf_out: &mut [Buffer])
+    {
+        let out = buf_out[0].get_mut();
+        for i in 0..out.len() {
+            out[i] = 0.0;
+        }
+        for buf in buf_in {
+            let buf = buf.get();
+            for i in 0..out.len() {
+                out[i] += buf[i];
+            }
+        }
+    }
 }

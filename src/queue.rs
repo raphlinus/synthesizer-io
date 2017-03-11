@@ -19,7 +19,7 @@ use std::sync::atomic::Ordering::{Relaxed, Release};
 use std::sync::Arc;
 use std::thread;
 use std::ptr;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::marker::PhantomData;
 use std::time;
 
@@ -57,11 +57,27 @@ pub struct Item<T> {
 }
 // TODO: it would be great to disable drop
 
+impl<T> Item<T> {
+    pub fn make_item(payload: T) -> Item<T> {
+        let ptr = Box::into_raw(Box::new(Node {
+            payload: payload,
+            child: ptr::null_mut(),
+        }));
+        Item { ptr: ptr }
+    }
+}
+
 impl<T> Deref for Item<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
         unsafe { &(*self.ptr).payload }
+    }
+}
+
+impl<T> DerefMut for Item<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { &mut (*self.ptr).payload }
     }
 }
 
@@ -129,11 +145,7 @@ impl<T: 'static> Queue<T> {
     }
 
     fn send(&self, payload: T) {
-        let n = Box::into_raw(Box::new(Node {
-            payload: payload,
-            child: ptr::null_mut(),
-        }));
-        self.push_raw(n);
+        self.send_item(Item::make_item(payload));
     }
 
     fn recv(&self) -> QueueMoveIter<T> {

@@ -12,12 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod queue;
-mod graph;
-mod module;
-mod modules;
-mod worker;
+//! A collection of audio processing modules.
 
-fn main() {
-    queue::main();
-}
+pub mod sum;
+pub mod buzz;
