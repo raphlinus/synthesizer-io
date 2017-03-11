@@ -16,3 +16,4 @@
 
 pub mod sum;
 pub mod buzz;
+pub mod sin;

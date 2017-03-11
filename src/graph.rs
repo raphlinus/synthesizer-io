@@ -63,6 +63,8 @@ pub struct Node {
 }
 
 impl Node {
+    /// Create a new node. The index must be given, as well as the input wiring.
+    // TODO: should we take Vec instead of boxed slice?
     pub fn create(module: Box<Module>, ix: usize, in_buf_wiring: Box<[(usize, usize)]>,
         in_ctrl_wiring: Box<[(usize, usize)]>) -> Node
     {
