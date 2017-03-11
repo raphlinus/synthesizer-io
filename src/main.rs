@@ -14,6 +14,9 @@
 
 extern crate coreaudio;
 
+#[macro_use]
+extern crate lazy_static;
+
 use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat};
 use coreaudio::audio_unit::render_callback::{self, data};
 

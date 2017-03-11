@@ -6,3 +6,4 @@ authors = ["Raph Levien <raph@google.com>"]
 
 [dependencies]
 coreaudio-rs = "0.6"
+lazy_static = "0.2"
