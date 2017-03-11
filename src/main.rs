@@ -17,18 +17,16 @@ extern crate coreaudio;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate synthesizer_io;
+
 use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat};
 use coreaudio::audio_unit::render_callback::{self, data};
 
-mod queue;
-mod graph;
-mod module;
-mod modules;
-mod worker;
+use synthesizer_io::modules;
 
-use worker::Worker;
-use graph::Node;
-use module::N_SAMPLES_PER_CHUNK;
+use synthesizer_io::worker::Worker;
+use synthesizer_io::graph::Node;
+use synthesizer_io::module::N_SAMPLES_PER_CHUNK;
 
 fn main() {
     let (mut worker, tx, rx) = Worker::create(1024);

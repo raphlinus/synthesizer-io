@@ -247,7 +247,7 @@ impl Worker {
     }
 }
 
-pub fn main() {
+pub fn try_queue() {
     let (tx, to_worker) = Queue::new();
     let (from_worker, rx) = Queue::new();
     let mut worker = Worker {
