@@ -12,16 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A collection of audio processing modules.
+//! A simple module that just sets a constant control parameter.
 
-mod sum;
-mod buzz;
-mod sin;
-mod biquad;
-mod const_ctrl;
+use module::{Module, Buffer};
 
-pub use self::sum::Sum;
-pub use self::buzz::Buzz;
-pub use self::sin::Sin;
-pub use self::biquad::Biquad;
-pub use self::const_ctrl::ConstCtrl;
+pub struct ConstCtrl {
+    value: f32,
+}
+
+impl ConstCtrl {
+    pub fn new(value: f32) -> ConstCtrl {
+        ConstCtrl { value: value }
+    }
+}
+
+impl Module for ConstCtrl {
+    fn n_ctrl_out(&self) -> usize { 1 }
+
+    fn process(&mut self, _control_in: &[f32], control_out: &mut [f32],
+        _buf_in: &[&Buffer], _buf_out: &mut [Buffer])
+    {
+        control_out[0] = self.value;
+    }
+}

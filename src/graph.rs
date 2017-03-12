@@ -89,6 +89,10 @@ impl<T: Clone> IntoBoxedSlice<T> for [T; 1] {
     fn into_box(self) -> Box<[T]> { self[..].into_box() }
 }
 
+impl<T: Clone> IntoBoxedSlice<T> for [T; 2] {
+    fn into_box(self) -> Box<[T]> { self[..].into_box() }
+}
+
 impl Node {
     /// Create a new node. The index must be given, as well as the input wiring.
     pub fn create<B1: IntoBoxedSlice<(usize, usize)>,
@@ -101,7 +105,7 @@ impl Node {
             out_bufs.push(Buffer::default());
         }
         let out_bufs = out_bufs.into_boxed_slice();
-        let out_ctrl = vec![0.0; module.n_bufs_out()].into_boxed_slice();
+        let out_ctrl = vec![0.0; module.n_ctrl_out()].into_boxed_slice();
         Node {
             ix: ix,
             module: module,

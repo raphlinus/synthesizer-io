@@ -14,7 +14,7 @@
 
 //! A simple module that makes a sine wave.
 
-use std::f64::consts;
+use std::f32::consts;
 use std::ops::Deref;
 
 use module::{Module, Buffer};
@@ -25,56 +25,53 @@ const N_SAMPLES: usize = (1 << LG_N_SAMPLES);
 lazy_static! {
     static ref SINTAB: [f32; N_SAMPLES + 1] = {
         let mut t = [0.0; N_SAMPLES + 1];
-        let dth = 2.0 * consts::PI / (N_SAMPLES as f64);
-        for i in 0..N_SAMPLES {
-            t[i] = (i as f64 * dth).sin() as f32
+        let dth = 2.0 * consts::PI / (N_SAMPLES as f32);
+        for i in 0..N_SAMPLES/2 {
+            let s = (i as f32 * dth).sin();
+            t[i] = s;
+            t[i + N_SAMPLES / 2] = -s;
         }
+        // TODO: more optimization is possible
         // t[N_SAMPLES] = t[0], but not necessary because it's already 0
         t
     };
 }
 
 pub struct Sin {
+    sr_offset: f32,
     phase: f32,
-    freq: f32,  // pre-scaled by N_SAMPLES
 }
 
 impl Sin {
-    /// Frequency is specified in cycles per sample. Note: we'll move to freq as
-    /// a control input.
-    pub fn new(freq: f32) -> Sin {
+    pub fn new(sample_rate: f32) -> Sin {
         // make initialization happen here so it doesn't happen in process
         let _ = SINTAB.deref();
         Sin {
+            sr_offset: LG_N_SAMPLES as f32 - sample_rate.log2(),
             phase: 0.0,
-            freq: freq * N_SAMPLES as f32,
         }
     }
-}
-
-// Note: this generates poor code on rustc 1.14 with the generic x86_64 cpu target,
-// but good code when target_cpu is set to penryn or later. There are techniques
-// for better code; probably the best thing is to file a bug with Rust upstream.
-fn mod_1(x: f32) -> f32 {
-    x - x.floor()
 }
 
 impl Module for Sin {
     fn n_bufs_out(&self) -> usize { 1 }
 
-    fn process(&mut self, _control_in: &[f32], _control_out: &mut [f32],
+    fn process(&mut self, control_in: &[f32], _control_out: &mut [f32],
         _buf_in: &[&Buffer], buf_out: &mut [Buffer])
     {
+        let freq = (control_in[0] + self.sr_offset).exp2();
         let tab = SINTAB.deref();
         let out = buf_out[0].get_mut();
-        let mut phase = self.phase * N_SAMPLES as f32;
+        let mut phase = self.phase;
         for i in 0..out.len() {
-            let tab_ix = phase as u32 as usize % N_SAMPLES;
+            let phaseint = phase as i32;
+            let tab_ix = phaseint as usize % N_SAMPLES;
             let y0 = tab[tab_ix];
             let y1 = tab[tab_ix + 1];
-            out[i] = y0 + (y1 - y0) * mod_1(phase);
-            phase += self.freq;
+            out[i] = y0 + (y1 - y0) * (phase - phaseint as f32);
+            phase += freq;
         }
-        self.phase = mod_1(phase * (1.0 / N_SAMPLES as f32));
+        let phaseint = phase as i32;
+        self.phase = phase - (phaseint & -(N_SAMPLES as i32)) as f32;
     }
 }

@@ -14,9 +14,6 @@
 
 extern crate coreaudio;
 
-#[macro_use]
-extern crate lazy_static;
-
 extern crate synthesizer_io;
 
 use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat};
@@ -30,19 +27,34 @@ use synthesizer_io::module::N_SAMPLES_PER_CHUNK;
 
 fn main() {
     let (mut worker, tx, rx) = Worker::create(1024);
-    let module = Box::new(modules::sin::Sin::new(440.0 / 44_100.0));
-    let node = Node::create(module, 1, [], []);
-    worker.handle_node(node);
-    let module = Box::new(modules::sin::Sin::new(880.0 / 44_100.0));
-    let node = Node::create(module, 2, [], []);
-    worker.handle_node(node);
-    let module = Box::new(modules::sum::Sum);
-    let node = Node::create(module, 0, vec![(1, 0), (2, 0)], []);
-    worker.handle_node(node);
+
+    /*
+    let module = Box::new(modules::ConstCtrl::new(440.0f32.log2()));
+    worker.handle_node(Node::create(module, 1, [], []));
+    let module = Box::new(modules::Sin::new(44_100.0));
+    worker.handle_node(Node::create(module, 2, [], [(1, 0)]));
+    let module = Box::new(modules::ConstCtrl::new(880.0f32.log2()));
+    worker.handle_node(Node::create(module, 3, [], []));
+    let module = Box::new(modules::Sin::new(44_100.0));
+    worker.handle_node(Node::create(module, 4, [], [(3, 0)]));
+    let module = Box::new(modules::Sum);
+    worker.handle_node(Node::create(module, 0, [(2, 0), (4, 0)], []));
+    */
+
+    let module = Box::new(modules::Buzz);
+    worker.handle_node(Node::create(module, 1, [], []));
+    let module = Box::new(modules::ConstCtrl::new(880.0f32.log2()));
+    worker.handle_node(Node::create(module, 3, [], []));
+    let module = Box::new(modules::ConstCtrl::new(0.5));
+    worker.handle_node(Node::create(module, 4, [], []));
+    let module = Box::new(modules::Biquad::new(44_100.0));
+    worker.handle_node(Node::create(module, 0, [(1,0)], [(3, 0), (4, 0)]));
+
     let _audio_unit = run(worker).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(1_000));
-    let module = Box::new(modules::sin::Sin::new(440.0 * 1.5 / 44_100.0));
-    let node = Node::create(module, 2, [], []);
+
+    let module = Box::new(modules::ConstCtrl::new((440.0f32 * 1.5).log2()));
+    let node = Node::create(module, 3, [], []);
     tx.send(node);
     std::thread::sleep(std::time::Duration::from_millis(1_000));
 }
@@ -60,7 +72,7 @@ fn run(mut worker: Worker) -> Result<AudioUnit, coreaudio::Error> {
 
     type Args = render_callback::Args<data::NonInterleaved<f32>>;
     audio_unit.set_render_callback(move |args| {
-        let Args { num_frames, mut data, .. } = args;
+        let Args { num_frames, mut data, .. }: Args = args;
         assert!(num_frames % N_SAMPLES_PER_CHUNK == 0);
         let mut i = 0;
         while i < num_frames {
