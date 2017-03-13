@@ -13,6 +13,8 @@
 // limitations under the License.
 
 extern crate coreaudio;
+extern crate coremidi;
+extern crate time;
 
 extern crate synthesizer_io;
 
@@ -22,8 +24,34 @@ use coreaudio::audio_unit::render_callback::{self, data};
 use synthesizer_io::modules;
 
 use synthesizer_io::worker::Worker;
+use synthesizer_io::queue::Sender;
 use synthesizer_io::graph::{Node, Message};
 use synthesizer_io::module::N_SAMPLES_PER_CHUNK;
+
+fn set_ctrl_const(value: u8, lo: f32, hi: f32, ix: usize, tx: &Sender<Message>) {
+    let value = lo + value as f32 * (1.0/127.0) * (hi - lo);
+    let module = Box::new(modules::ConstCtrl::new(value));
+    let node = Node::create(module, ix, [], []);
+    tx.send(Message::Node(node));
+}
+
+fn dispatch_midi(data: &[u8], tx: &Sender<Message>) {
+    let mut i = 0;
+    while i < data.len() {
+        if data[i] == 0xb0 {
+            let controller = data[i + 1];
+            let value = data[i + 2];
+            match controller {
+                1 => set_ctrl_const(value, 0.0, 22_000f32.log2(), 3, tx),
+                2 => set_ctrl_const(value, 0.0, 0.995, 4, tx),
+                _ => println!("don't have handler for controller {}", controller),
+            }
+            i += 3;
+        } else {
+            break;
+        }
+    }
+}
 
 fn main() {
     let (mut worker, tx, rx) = Worker::create(1024);
@@ -56,7 +84,35 @@ fn main() {
     let module = Box::new(modules::ConstCtrl::new((440.0f32 * 1.5).log2()));
     let node = Node::create(module, 3, [], []);
     tx.send(Message::Node(node));
-    std::thread::sleep(std::time::Duration::from_millis(1_000));
+    let source_index = 0;
+    if source_index < coremidi::Sources::count() {
+        let source = coremidi::Source::from_index(source_index);
+        println!("Listening for midi from {}", source.display_name().unwrap());
+        let client = coremidi::Client::new("synthesizer-client").unwrap();
+        let mut last_ts = 0;
+        let mut last_val = 0;
+        let callback = move |packet_list: &coremidi::PacketList| {
+            for packet in packet_list.iter() {
+                let data = packet.data();
+                let delta_t = packet.timestamp() - last_ts;
+                let speed = 1e9 * (data[2] as f64 - last_val as f64) / delta_t as f64;
+                println!("{} {:3.3} {} {}", speed, delta_t as f64 * 1e-6, data[2],
+                    time::precise_time_ns() - packet.timestamp());
+                last_val = data[2];
+                last_ts = packet.timestamp();
+                dispatch_midi(&data, &tx);
+            }
+        };
+        let input_port = client.input_port("synthesizer-port", callback).unwrap();
+        input_port.connect_source(&source).unwrap();
+
+        println!("Press Enter to exit.");
+        let mut line = String::new();
+        ::std::io::stdin().read_line(&mut line).unwrap();
+        input_port.disconnect_source(&source).unwrap();
+    } else {
+        println!("No midi available");
+    }
 }
 
 fn run(mut worker: Worker) -> Result<AudioUnit, coreaudio::Error> {

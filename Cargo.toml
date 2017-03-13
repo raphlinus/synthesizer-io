@@ -7,3 +7,6 @@ authors = ["Raph Levien <raph@google.com>"]
 [dependencies]
 coreaudio-rs = "0.6"
 lazy_static = "0.2"
+coremidi = { path = "/Users/raph/github/coremidi" }
+time = "0.1"
+#coremidi = "0.1"
