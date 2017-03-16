@@ -22,7 +22,7 @@ use coreaudio::audio_unit::render_callback::{self, data};
 use synthesizer_io::modules;
 
 use synthesizer_io::worker::Worker;
-use synthesizer_io::graph::Node;
+use synthesizer_io::graph::{Node, Message};
 use synthesizer_io::module::N_SAMPLES_PER_CHUNK;
 
 fn main() {
@@ -55,7 +55,7 @@ fn main() {
 
     let module = Box::new(modules::ConstCtrl::new((440.0f32 * 1.5).log2()));
     let node = Node::create(module, 3, [], []);
-    tx.send(node);
+    tx.send(Message::Node(node));
     std::thread::sleep(std::time::Duration::from_millis(1_000));
 }
 

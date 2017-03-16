@@ -31,7 +31,7 @@ const MAX_BUF: usize = 16;
 pub const SENTINEL: usize = !0;
 
 pub struct Graph {
-    nodes: Box<[Option<Item<Node>>]>,
+    nodes: Box<[Option<Item<Message>>]>,
 
     // state for topo sort; all have same len
     visited: Box<[VisitedState]>,
@@ -49,6 +49,20 @@ enum VisitedState {
 }
 
 use self::VisitedState::*;
+
+pub enum Message {
+    Node(Node),
+    Quit,
+}
+
+impl Message {
+    fn get_node(&self) -> Option<&Node> {
+        match *self {
+            Message::Node(ref node) => Some(node),
+            _ => None,
+        }
+    }
+}
 
 pub struct Node {
     pub ix: usize,
@@ -134,30 +148,47 @@ impl Graph {
     /// Get the output buffers for the specified graph node. Panics if the
     /// index is not a valid, populated node. Lock-free.
     pub fn get_out_bufs(&self, ix: usize) -> &[Buffer] {
-        &self.nodes[ix].as_ref().unwrap().out_bufs
+        &self.get_node(ix).unwrap().out_bufs
+    }
+
+    fn get_node(&self, ix: usize) -> Option<&Node> {
+        self.nodes[ix].as_ref().and_then(|item| item.get_node())
+    }
+
+    fn get_node_mut(&mut self, ix: usize) -> Option<&mut Node> {
+        self.nodes[ix].as_mut().and_then(|msg| match *msg.deref_mut() {
+            Message::Node(ref mut n) => Some(n),
+            _ => None
+        })
     }
 
     /// Replace a graph node with a new item, returning the old value.
     /// Lock-free.
-    pub fn replace(&mut self, ix: usize, item: Option<Item<Node>>) -> Option<Item<Node>> {
-        mem::replace(&mut self.nodes[ix], item)
+    pub fn replace(&mut self, ix: usize, item: Option<Item<Message>>) -> Option<Item<Message>> {
+        let mut old_item = mem::replace(&mut self.nodes[ix], item);
+        if let Some(ref mut old) = old_item {
+            if let Message::Node(ref mut old_node) = *old.deref_mut() {
+                self.get_node_mut(ix).unwrap().module.migrate(old_node.module.deref_mut());
+            }
+        }
+        old_item
     }
 
     fn run_one_module(&mut self, module_ix: usize, ctrl: &mut [f32; MAX_CTRL],
         bufs: &mut [*const Buffer; MAX_BUF])
     {
         {
-            let this = self.nodes[module_ix].as_ref().unwrap();
+            let this = self.get_node(module_ix).unwrap();
             for (i, &(mod_ix, buf_ix)) in this.in_buf_wiring.iter().enumerate() {
                 // otherwise the transmute would cause aliasing
                 assert!(module_ix != mod_ix);
                 bufs[i] = &self.get_out_bufs(mod_ix)[buf_ix];
             }
             for (i, &(mod_ix, ctrl_ix)) in this.in_ctrl_wiring.iter().enumerate() {
-                ctrl[i] = self.nodes[mod_ix].as_ref().unwrap().out_ctrl[ctrl_ix];
+                ctrl[i] = self.get_node(mod_ix).unwrap().out_ctrl[ctrl_ix];
             }
         }
-        let this = self.nodes[module_ix].as_mut().unwrap().deref_mut();
+        let this = self.get_node_mut(module_ix).unwrap();
         let buf_in = unsafe { mem::transmute(&bufs[..this.in_buf_wiring.len()]) };
         let ctrl_in = &ctrl[..this.in_ctrl_wiring.len()];
         this.module.process(ctrl_in, &mut this.out_ctrl, buf_in, &mut this.out_bufs);
@@ -176,7 +207,7 @@ impl Graph {
         while stack != SENTINEL {
             if self.visited[stack] == Pushed {
                 self.visited[stack] = Scanned;
-                let node = self.nodes[stack].as_ref().unwrap();
+                let node = self.nodes[stack].as_ref().and_then(|item| item.get_node()).unwrap();
                 for &(ix, _) in node.in_buf_wiring.iter().chain(node.in_ctrl_wiring.iter()) {
                     if self.visited[ix] == NotVisited {
                         self.visited[ix] = Pushed;

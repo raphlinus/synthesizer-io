@@ -14,6 +14,8 @@
 
 //! The interface for a module that does some audio processing.
 
+use std::any::Any;
+
 pub const N_SAMPLES_PER_CHUNK: usize = 64;
 
 pub struct Buffer {
@@ -44,14 +46,30 @@ impl Default for Buffer {
     }
 }
 
-pub trait Module {
+pub trait Module: MyToAny {
     /// Report the number of buffers this module is expected to generate.
     fn n_bufs_out(&self) -> usize { 0 }
 
     /// Report the number of control values this module is expected to generate.
     fn n_ctrl_out(&self) -> usize { 0 }
 
+    /// Support for downcasting
+    fn to_any(&mut self) -> &mut Any { MyToAny::my_to_any(self) }
+
+    /// Give modules an opportunity to migrate state from the previous module
+    /// when it is replaced.
+    #[allow(unused)]
+    fn migrate(&mut self, old: &mut Module) {}
+
     /// Process one chunk of audio. Implementations are expected to be lock-free.
     fn process(&mut self, control_in: &[f32], control_out: &mut [f32],
         buf_in: &[&Buffer], buf_out: &mut [Buffer]);
+}
+
+pub trait MyToAny {
+    fn my_to_any(&mut self) -> &mut Any;
+}
+
+impl<T: Sized + 'static> MyToAny for T {
+    fn my_to_any(&mut self) -> &mut Any { self }
 }

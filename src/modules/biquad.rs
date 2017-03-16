@@ -27,7 +27,6 @@ pub struct Biquad {
 
 impl Biquad {
     pub fn new(sample_rate: f32) -> Biquad {
-        // TODO: set matrix to something good
         Biquad {
             sr_offset: consts::PI.log2() - sample_rate.log2(),
             state: [0.0; 2],
