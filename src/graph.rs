@@ -52,6 +52,7 @@ use self::VisitedState::*;
 
 pub enum Message {
     Node(Node),
+    SetParam(SetParam),
     Quit,
 }
 
@@ -74,6 +75,14 @@ pub struct Node {
     in_ctrl_wiring: Box<[(usize, usize)]>,
     out_bufs: Box<[Buffer]>,
     out_ctrl: Box<[f32]>,
+}
+
+/// A struct that contains the data for setting a parameter
+pub struct SetParam {
+    pub ix: usize,
+    pub param_ix: usize,
+    pub val: f32,
+    pub timestamp: u64,
 }
 
 pub trait IntoBoxedSlice<T> {
@@ -162,6 +171,10 @@ impl Graph {
         })
     }
 
+    pub fn get_module_mut(&mut self, ix: usize) -> &mut Module {
+        self.get_node_mut(ix).unwrap().module.deref_mut()
+    }
+
     /// Replace a graph node with a new item, returning the old value.
     /// Lock-free.
     pub fn replace(&mut self, ix: usize, item: Option<Item<Message>>) -> Option<Item<Message>> {
@@ -175,7 +188,7 @@ impl Graph {
     }
 
     fn run_one_module(&mut self, module_ix: usize, ctrl: &mut [f32; MAX_CTRL],
-        bufs: &mut [*const Buffer; MAX_BUF])
+        bufs: &mut [*const Buffer; MAX_BUF], timestamp: u64)
     {
         {
             let this = self.get_node(module_ix).unwrap();
@@ -191,7 +204,8 @@ impl Graph {
         let this = self.get_node_mut(module_ix).unwrap();
         let buf_in = unsafe { mem::transmute(&bufs[..this.in_buf_wiring.len()]) };
         let ctrl_in = &ctrl[..this.in_ctrl_wiring.len()];
-        this.module.process(ctrl_in, &mut this.out_ctrl, buf_in, &mut this.out_bufs);
+        this.module.process_ts(ctrl_in, &mut this.out_ctrl, buf_in, &mut this.out_bufs,
+            timestamp);
     }
 
     fn topo_sort(&mut self, root: usize) -> usize {
@@ -239,7 +253,7 @@ impl Graph {
 
     /// Run the graph. On return, the buffer for the given root node will be
     /// filled. Designed to be lock-free.
-    pub fn run_graph(&mut self, root: usize) {
+    pub fn run_graph(&mut self, root: usize, timestamp: u64) {
         // scratch space, here to amortize the initialization costs
         let mut ctrl = [0.0f32; MAX_CTRL];
         let mut bufs = [ptr::null(); MAX_BUF];
@@ -247,7 +261,7 @@ impl Graph {
         // TODO: don't do topo sort every time, reuse if graph hasn't changed
         let mut ix = self.topo_sort(root);
         while ix != SENTINEL {
-            self.run_one_module(ix, &mut ctrl, &mut bufs);
+            self.run_one_module(ix, &mut ctrl, &mut bufs, timestamp);
             self.visited[ix] = NotVisited;  // reset state for next topo sort
             ix = self.link[ix];
         }

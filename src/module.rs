@@ -64,6 +64,20 @@ pub trait Module: MyToAny {
     /// Process one chunk of audio. Implementations are expected to be lock-free.
     fn process(&mut self, control_in: &[f32], control_out: &mut [f32],
         buf_in: &[&Buffer], buf_out: &mut [Buffer]);
+
+    /// Process one chunk of audio. Implementations are expected to be lock-free.
+    /// Implementations should override this method if they require a timestamp,
+    /// otherwise `process`.
+    #[allow(unused)]
+    fn process_ts(&mut self, control_in: &[f32], control_out: &mut [f32],
+        buf_in: &[&Buffer], buf_out: &mut [Buffer], timestamp: u64)
+    {
+        self.process(control_in, control_out, buf_in, buf_out);
+    }
+
+    /// Set a param (or, in general, accept a control message).
+    #[allow(unused)]
+    fn set_param(&mut self, param_ix: usize, val: f32, timestamp: u64) {}
 }
 
 pub trait MyToAny {

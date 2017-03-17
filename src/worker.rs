@@ -57,22 +57,31 @@ impl Worker {
 
     fn handle_item(&mut self, item: Item<Message>) {
         let ix = match *item.deref() {
-            Message::Node(ref node) => node.ix,
+            Message::Node(ref node) => Some(node.ix),
+            Message::SetParam(ref param) => {
+                let module = self.graph.get_module_mut(param.ix);
+                module.set_param(param.param_ix, param.val, param.timestamp);
+                None
+            }
             _ => return, // NYI
         };
-        let old_item = self.graph.replace(ix, Some(item));
-        if let Some(old_item) = old_item {
-            self.from_worker.send_item(old_item);
-        }        
+        if let Some(ix) = ix {
+            let old_item = self.graph.replace(ix, Some(item));
+            if let Some(old_item) = old_item {
+                self.from_worker.send_item(old_item);
+            }
+        } else {
+            self.from_worker.send_item(item);
+        }
     }
 
     /// Process the incoming items, run the graph, and return the rendered audio
     /// buffers. Lock-free.
-    pub fn work(&mut self) -> &[Buffer] {
+    pub fn work(&mut self, timestamp: u64) -> &[Buffer] {
         for item in self.to_worker.recv_items() {
             self.handle_item(item);
         }
-        self.graph.run_graph(self.root);
+        self.graph.run_graph(self.root, timestamp);
         self.graph.get_out_bufs(self.root)
     }
 }
