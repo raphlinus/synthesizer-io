@@ -63,6 +63,13 @@ impl Worker {
                 module.set_param(param.param_ix, param.val, param.timestamp);
                 None
             }
+            Message::Note(ref note) => {
+                for &ix in note.ixs.iter() {
+                    let module = self.graph.get_module_mut(ix);
+                    module.handle_note(note.midi_num, note.velocity, note.on);
+                }
+                None
+            }
             _ => return, // NYI
         };
         if let Some(ix) = ix {
@@ -77,6 +84,8 @@ impl Worker {
 
     /// Process the incoming items, run the graph, and return the rendered audio
     /// buffers. Lock-free.
+    // TODO: leave incoming items in the queue if they have a timestamp in the
+    // future.
     pub fn work(&mut self, timestamp: u64) -> &[Buffer] {
         for item in self.to_worker.recv_items() {
             self.handle_item(item);

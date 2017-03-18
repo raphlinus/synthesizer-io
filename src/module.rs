@@ -78,6 +78,10 @@ pub trait Module: MyToAny {
     /// Set a param (or, in general, accept a control message).
     #[allow(unused)]
     fn set_param(&mut self, param_ix: usize, val: f32, timestamp: u64) {}
+
+    /// Handle a note on or off message.
+    #[allow(unused)]
+    fn handle_note(&mut self, midi_num: f32, velocity: f32, on: bool) {}
 }
 
 pub trait MyToAny {

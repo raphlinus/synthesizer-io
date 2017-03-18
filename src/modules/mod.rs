@@ -21,6 +21,7 @@ mod saw;
 mod biquad;
 mod const_ctrl;
 mod smooth_ctrl;
+mod note_pitch;
 
 pub use self::sum::Sum;
 pub use self::buzz::Buzz;
@@ -29,3 +30,4 @@ pub use self::saw::Saw;
 pub use self::biquad::Biquad;
 pub use self::const_ctrl::ConstCtrl;
 pub use self::smooth_ctrl::SmoothCtrl;
+pub use self::note_pitch::NotePitch;

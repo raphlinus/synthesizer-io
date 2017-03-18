@@ -25,7 +25,7 @@ use synthesizer_io::modules;
 
 use synthesizer_io::worker::Worker;
 use synthesizer_io::queue::Sender;
-use synthesizer_io::graph::{Node, Message, SetParam};
+use synthesizer_io::graph::{Node, Message, SetParam, Note};
 use synthesizer_io::module::N_SAMPLES_PER_CHUNK;
 
 fn set_ctrl_const(value: u8, lo: f32, hi: f32, ix: usize, tx: &Sender<Message>, ts: u64) {
@@ -37,6 +37,19 @@ fn set_ctrl_const(value: u8, lo: f32, hi: f32, ix: usize, tx: &Sender<Message>, 
         timestamp: ts,
     };
     tx.send(Message::SetParam(param));
+}
+
+fn send_note(ixs: Vec<usize>, midi_num: f32, velocity: f32, on: bool,
+    tx: &Sender<Message>, ts: u64)
+{
+    let note = Note {
+        ixs: ixs.into_boxed_slice(),
+        midi_num: midi_num,
+        velocity: velocity,
+        on: on,
+        timestamp: ts,
+    };
+    tx.send(Message::Note(note));
 }
 
 fn dispatch_midi(data: &[u8], tx: &Sender<Message>, ts: u64) {
@@ -51,6 +64,13 @@ fn dispatch_midi(data: &[u8], tx: &Sender<Message>, ts: u64) {
                 3 => set_ctrl_const(value, 0.0, 22_000f32.log2(), 5, tx, ts),
                 _ => println!("don't have handler for controller {}", controller),
             }
+            i += 3;
+        } else if data[i] == 0x90 || data[i] == 0x80 {
+            let midi_num = data[i + 1];
+            let velocity = data[i + 2];
+            let on = data[i] == 0x90 && velocity > 0;
+            println!("{} {}", data[i + 1], data[i + 2]);
+            send_note(vec![5], midi_num as f32, velocity as f32, on, tx, ts);
             i += 3;
         } else {
             break;
@@ -80,7 +100,7 @@ fn main() {
     worker.handle_node(Node::create(module, 3, [], []));
     let module = Box::new(modules::SmoothCtrl::new(0.5));
     worker.handle_node(Node::create(module, 4, [], []));
-    let module = Box::new(modules::SmoothCtrl::new(880.0f32.log2()));
+    let module = Box::new(modules::NotePitch::new());
     worker.handle_node(Node::create(module, 5, [], []));
     let module = Box::new(modules::Biquad::new(44_100.0));
     worker.handle_node(Node::create(module, 0, [(1,0)], [(3, 0), (4, 0)]));

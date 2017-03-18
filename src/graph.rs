@@ -28,7 +28,7 @@ const MAX_CTRL: usize = 16;
 // maximum number of buffer inputs
 const MAX_BUF: usize = 16;
 
-pub const SENTINEL: usize = !0;
+const SENTINEL: usize = !0;
 
 pub struct Graph {
     nodes: Box<[Option<Item<Message>>]>,
@@ -53,6 +53,7 @@ use self::VisitedState::*;
 pub enum Message {
     Node(Node),
     SetParam(SetParam),
+    Note(Note),
     Quit,
 }
 
@@ -82,6 +83,15 @@ pub struct SetParam {
     pub ix: usize,
     pub param_ix: usize,
     pub val: f32,
+    pub timestamp: u64,
+}
+
+/// A struct that represents a note on/off event
+pub struct Note {
+    pub ixs: Box<[usize]>,  // list of node ix's affected by this note
+    pub midi_num: f32,  // 69.0 = A4 (440Hz)
+    pub velocity: f32,  // 1 = minimum, 127 = maximum
+    pub on: bool,
     pub timestamp: u64,
 }
 
