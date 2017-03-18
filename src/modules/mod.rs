@@ -17,6 +17,7 @@
 mod sum;
 mod buzz;
 mod sin;
+mod saw;
 mod biquad;
 mod const_ctrl;
 mod smooth_ctrl;
@@ -24,6 +25,7 @@ mod smooth_ctrl;
 pub use self::sum::Sum;
 pub use self::buzz::Buzz;
 pub use self::sin::Sin;
+pub use self::saw::Saw;
 pub use self::biquad::Biquad;
 pub use self::const_ctrl::ConstCtrl;
 pub use self::smooth_ctrl::SmoothCtrl;

@@ -48,6 +48,7 @@ fn dispatch_midi(data: &[u8], tx: &Sender<Message>, ts: u64) {
             match controller {
                 1 => set_ctrl_const(value, 0.0, 22_000f32.log2(), 3, tx, ts),
                 2 => set_ctrl_const(value, 0.0, 0.995, 4, tx, ts),
+                3 => set_ctrl_const(value, 0.0, 22_000f32.log2(), 5, tx, ts),
                 _ => println!("don't have handler for controller {}", controller),
             }
             i += 3;
@@ -73,12 +74,14 @@ fn main() {
     worker.handle_node(Node::create(module, 0, [(2, 0), (4, 0)], []));
     */
 
-    let module = Box::new(modules::Buzz);
-    worker.handle_node(Node::create(module, 1, [], []));
+    let module = Box::new(modules::Saw::new(44_100.0));
+    worker.handle_node(Node::create(module, 1, [], [(5, 0)]));
     let module = Box::new(modules::SmoothCtrl::new(880.0f32.log2()));
     worker.handle_node(Node::create(module, 3, [], []));
     let module = Box::new(modules::SmoothCtrl::new(0.5));
     worker.handle_node(Node::create(module, 4, [], []));
+    let module = Box::new(modules::SmoothCtrl::new(880.0f32.log2()));
+    worker.handle_node(Node::create(module, 5, [], []));
     let module = Box::new(modules::Biquad::new(44_100.0));
     worker.handle_node(Node::create(module, 0, [(1,0)], [(3, 0), (4, 0)]));
 
