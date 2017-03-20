@@ -22,6 +22,8 @@ mod biquad;
 mod const_ctrl;
 mod smooth_ctrl;
 mod note_pitch;
+mod adsr;
+mod gain;
 
 pub use self::sum::Sum;
 pub use self::buzz::Buzz;
@@ -31,3 +33,5 @@ pub use self::biquad::Biquad;
 pub use self::const_ctrl::ConstCtrl;
 pub use self::smooth_ctrl::SmoothCtrl;
 pub use self::note_pitch::NotePitch;
+pub use self::adsr::Adsr;
+pub use self::gain::Gain;

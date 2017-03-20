@@ -28,52 +28,77 @@ use synthesizer_io::queue::Sender;
 use synthesizer_io::graph::{Node, Message, SetParam, Note};
 use synthesizer_io::module::N_SAMPLES_PER_CHUNK;
 
-fn set_ctrl_const(value: u8, lo: f32, hi: f32, ix: usize, tx: &Sender<Message>, ts: u64) {
-    let value = lo + value as f32 * (1.0/127.0) * (hi - lo);
-    let param = SetParam {
-        ix: ix,
-        param_ix: 0,
-        val: value,
-        timestamp: ts,
-    };
-    tx.send(Message::SetParam(param));
+struct Midi {
+    tx: Sender<Message>,
+    cur_note: Option<u8>,
 }
 
-fn send_note(ixs: Vec<usize>, midi_num: f32, velocity: f32, on: bool,
-    tx: &Sender<Message>, ts: u64)
-{
-    let note = Note {
-        ixs: ixs.into_boxed_slice(),
-        midi_num: midi_num,
-        velocity: velocity,
-        on: on,
-        timestamp: ts,
-    };
-    tx.send(Message::Note(note));
-}
+impl Midi {
+    fn new(tx: Sender<Message>) -> Midi {
+        Midi {
+            tx: tx,
+            cur_note: None,
+        }
+    }
 
-fn dispatch_midi(data: &[u8], tx: &Sender<Message>, ts: u64) {
-    let mut i = 0;
-    while i < data.len() {
-        if data[i] == 0xb0 {
-            let controller = data[i + 1];
-            let value = data[i + 2];
-            match controller {
-                1 => set_ctrl_const(value, 0.0, 22_000f32.log2(), 3, tx, ts),
-                2 => set_ctrl_const(value, 0.0, 0.995, 4, tx, ts),
-                3 => set_ctrl_const(value, 0.0, 22_000f32.log2(), 5, tx, ts),
-                _ => println!("don't have handler for controller {}", controller),
+    fn send(&self, msg: Message) {
+        self.tx.send(msg);
+    }
+
+    fn set_ctrl_const(&mut self, value: u8, lo: f32, hi: f32, ix: usize, ts: u64) {
+        let value = lo + value as f32 * (1.0/127.0) * (hi - lo);
+        let param = SetParam {
+            ix: ix,
+            param_ix: 0,
+            val: value,
+            timestamp: ts,
+        };
+        self.send(Message::SetParam(param));
+    }
+
+    fn send_note(&mut self, ixs: Vec<usize>, midi_num: f32, velocity: f32, on: bool,
+        ts: u64)
+    {
+        let note = Note {
+            ixs: ixs.into_boxed_slice(),
+            midi_num: midi_num,
+            velocity: velocity,
+            on: on,
+            timestamp: ts,
+        };
+        self.send(Message::Note(note));
+    }
+
+    fn dispatch_midi(&mut self, data: &[u8], ts: u64) {
+        let mut i = 0;
+        while i < data.len() {
+            if data[i] == 0xb0 {
+                let controller = data[i + 1];
+                let value = data[i + 2];
+                match controller {
+                    1 => self.set_ctrl_const(value, 0.0, 22_000f32.log2(), 3, ts),
+                    2 => self.set_ctrl_const(value, 0.0, 0.995, 4, ts),
+                    3 => self.set_ctrl_const(value, 0.0, 22_000f32.log2(), 5, ts),
+
+                    5 => self.set_ctrl_const(value, 0.0, 10.0, 11, ts),
+                    6 => self.set_ctrl_const(value, 0.0, 10.0, 12, ts),
+                    7 => self.set_ctrl_const(value, 0.0, 6.0, 13, ts),
+                    8 => self.set_ctrl_const(value, 0.0, 10.0, 14, ts),
+                    _ => println!("don't have handler for controller {}", controller),
+                }
+                i += 3;
+            } else if data[i] == 0x90 || data[i] == 0x80 {
+                let midi_num = data[i + 1];
+                let velocity = data[i + 2];
+                let on = data[i] == 0x90 && velocity > 0;
+                if on || self.cur_note == Some(midi_num) {
+                    self.send_note(vec![5, 7], midi_num as f32, velocity as f32, on, ts);
+                    self.cur_note = if on { Some(midi_num) } else { None }
+                }
+                i += 3;
+            } else {
+                break;
             }
-            i += 3;
-        } else if data[i] == 0x90 || data[i] == 0x80 {
-            let midi_num = data[i + 1];
-            let velocity = data[i + 2];
-            let on = data[i] == 0x90 && velocity > 0;
-            println!("{} {}", data[i + 1], data[i + 2]);
-            send_note(vec![5], midi_num as f32, velocity as f32, on, tx, ts);
-            i += 3;
-        } else {
-            break;
         }
     }
 }
@@ -103,14 +128,23 @@ fn main() {
     let module = Box::new(modules::NotePitch::new());
     worker.handle_node(Node::create(module, 5, [], []));
     let module = Box::new(modules::Biquad::new(44_100.0));
-    worker.handle_node(Node::create(module, 0, [(1,0)], [(3, 0), (4, 0)]));
+    worker.handle_node(Node::create(module, 6, [(1,0)], [(3, 0), (4, 0)]));
+    let module = Box::new(modules::Adsr::new());
+    worker.handle_node(Node::create(module, 7, [], vec![(11, 0), (12, 0), (13, 0), (14, 0)]));
+    let module = Box::new(modules::Gain::new());
+    worker.handle_node(Node::create(module, 0, [(6, 0)], [(7, 0)]));
+
+    let module = Box::new(modules::SmoothCtrl::new(5.0));
+    worker.handle_node(Node::create(module, 11, [], []));
+    let module = Box::new(modules::SmoothCtrl::new(5.0));
+    worker.handle_node(Node::create(module, 12, [], []));
+    let module = Box::new(modules::SmoothCtrl::new(4.0));
+    worker.handle_node(Node::create(module, 13, [], []));
+    let module = Box::new(modules::SmoothCtrl::new(5.0));
+    worker.handle_node(Node::create(module, 14, [], []));
 
     let _audio_unit = run(worker).unwrap();
-    std::thread::sleep(std::time::Duration::from_millis(1_000));
 
-    let module = Box::new(modules::SmoothCtrl::new((440.0f32 * 1.5).log2()));
-    let node = Node::create(module, 3, [], []);
-    tx.send(Message::Node(node));
     let source_index = 0;
     if source_index < coremidi::Sources::count() {
         let source = coremidi::Source::from_index(source_index);
@@ -118,6 +152,7 @@ fn main() {
         let client = coremidi::Client::new("synthesizer-client").unwrap();
         let mut last_ts = 0;
         let mut last_val = 0;
+        let mut midi = Midi::new(tx);
         let callback = move |packet_list: &coremidi::PacketList| {
             for packet in packet_list.iter() {
                 let data = packet.data();
@@ -127,7 +162,7 @@ fn main() {
                     time::precise_time_ns() - packet.timestamp());
                 last_val = data[2];
                 last_ts = packet.timestamp();
-                dispatch_midi(&data, &tx, last_ts);
+                midi.dispatch_midi(&data, last_ts);
             }
         };
         let input_port = client.input_port("synthesizer-port", callback).unwrap();
