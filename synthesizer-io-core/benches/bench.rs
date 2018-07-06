@@ -17,14 +17,14 @@
 #![feature(test)]
 
 extern crate test;
-extern crate synthesizer_io;
+extern crate synthesizer_io_core;
 
 #[cfg(test)]
 mod bench {
     use test::Bencher;
-    use synthesizer_io::module::{Module, Buffer};
-    use synthesizer_io::modules::Sin;
-    use synthesizer_io::modules::Biquad;
+    use synthesizer_io_core::module::{Module, Buffer};
+    use synthesizer_io_core::modules::Sin;
+    use synthesizer_io_core::modules::Biquad;
 
     #[bench]
     fn sin(b: &mut Bencher) {

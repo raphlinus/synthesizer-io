@@ -6,6 +6,8 @@ authors = ["Raph Levien <raph@google.com>"]
 
 [dependencies]
 coreaudio-rs = "0.9"
-lazy_static = "1.0"
 coremidi = "0.3"
 time = "0.1"
+
+[dependencies.synthesizer-io-core]
+path = "./synthesizer-io-core"

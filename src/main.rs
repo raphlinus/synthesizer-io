@@ -16,17 +16,17 @@ extern crate coreaudio;
 extern crate coremidi;
 extern crate time;
 
-extern crate synthesizer_io;
+extern crate synthesizer_io_core;
 
 use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat, Scope};
 use coreaudio::audio_unit::render_callback::{self, data};
 
-use synthesizer_io::modules;
+use synthesizer_io_core::modules;
 
-use synthesizer_io::worker::Worker;
-use synthesizer_io::queue::Sender;
-use synthesizer_io::graph::{Node, Message, SetParam, Note};
-use synthesizer_io::module::N_SAMPLES_PER_CHUNK;
+use synthesizer_io_core::worker::Worker;
+use synthesizer_io_core::queue::Sender;
+use synthesizer_io_core::graph::{Node, Message, SetParam, Note};
+use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
 
 struct Midi {
     tx: Sender<Message>,
