@@ -18,7 +18,7 @@ extern crate time;
 
 extern crate synthesizer_io;
 
-use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat};
+use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat, Scope};
 use coreaudio::audio_unit::render_callback::{self, data};
 
 use synthesizer_io::modules;
@@ -146,8 +146,7 @@ fn main() {
     let _audio_unit = run(worker).unwrap();
 
     let source_index = 0;
-    if source_index < coremidi::Sources::count() {
-        let source = coremidi::Source::from_index(source_index);
+    if let Some(source) = coremidi::Source::from_index(source_index) {
         println!("Listening for midi from {}", source.display_name().unwrap());
         let client = coremidi::Client::new("synthesizer-client").unwrap();
         let mut last_ts = 0;
@@ -182,7 +181,7 @@ fn run(mut worker: Worker) -> Result<AudioUnit, coreaudio::Error> {
     // Construct an Output audio unit that delivers audio to the default output device.
     let mut audio_unit = AudioUnit::new(IOType::DefaultOutput)?;
 
-    let stream_format = audio_unit.stream_format()?;
+    let stream_format = audio_unit.stream_format(Scope::Output)?;
     //println!("{:#?}", &stream_format);
 
     // We expect `f32` data.
