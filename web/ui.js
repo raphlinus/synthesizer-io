@@ -285,8 +285,8 @@ class ModuleGrid {
     constructor(grid) {
         this.grid = grid;
         this.guide = null;
-        this.guideWidth = 2;
-        this.guideHeight = 2;
+        this.guideWidth = 3;
+        this.guideHeight = 3;
         this.modules = [];
     }
 

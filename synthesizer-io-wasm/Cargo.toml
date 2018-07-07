@@ -1,0 +1,19 @@
+[package]
+name = "synthesizer-io-wasm"
+version = "0.1.0"
+license = "Apache-2.0"
+authors = ["Raph Levien <raph@google.com>"]
+description = "WebAssembly bindings for the synthesizer core."
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[dependencies.synthesizer-io-core]
+path = "../synthesizer-io-core"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+debug = false
+lto = true
