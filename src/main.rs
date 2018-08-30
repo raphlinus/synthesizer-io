@@ -12,14 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(target_os = "macos")]
 extern crate coreaudio;
+#[cfg(target_os = "macos")]
 extern crate coremidi;
+
+#[cfg(not(target_os = "macos"))]
+extern crate cpal;
+#[cfg(not(target_os = "macos"))]
+extern crate midir;
+
 extern crate time;
 
 extern crate synthesizer_io_core;
 
+#[cfg(target_os = "macos")]
 use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat, Scope};
+#[cfg(target_os = "macos")]
 use coreaudio::audio_unit::render_callback::{self, data};
+
+#[cfg(not(target_os = "macos"))]
+use cpal::{EventLoop, StreamData, UnknownTypeOutputBuffer};
+
+#[cfg(not(target_os = "macos"))]
+use midir::MidiInput;
+#[cfg(not(target_os = "macos"))]
+use std::ops::DerefMut;
 
 use synthesizer_io_core::modules;
 
@@ -143,7 +161,66 @@ fn main() {
     let module = Box::new(modules::SmoothCtrl::new(5.0));
     worker.handle_node(Node::create(module, 14, [], []));
 
-    let _audio_unit = run(worker).unwrap();
+    #[cfg(target_os = "macos")]
+    run_mac(worker, tx);
+
+    #[cfg(not(target_os = "macos"))]
+    run_cpal(worker, tx);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn run_cpal(mut worker: Worker, tx: Sender<Message>) {
+    let event_loop = EventLoop::new();
+    let device = cpal::default_output_device().expect("no output device");
+    let mut supported_formats_range = device.supported_output_formats()
+        .expect("error while querying formats");
+    let format = supported_formats_range.next()
+        .expect("no supported format?!")
+        .with_max_sample_rate();
+    println!("format: {:?}", format);
+    let stream_id = event_loop.build_output_stream(&device, &format).unwrap();
+    event_loop.play_stream(stream_id);
+
+    // midi setup
+    let mut midi = Midi::new(tx);
+
+    let mut midi_in = MidiInput::new("midir input").expect("can't create midi input");
+    midi_in.ignore(::midir::Ignore::None);
+    let result =  midi_in.connect(0, "in", move |ts, data, _| {
+        //println!("{}, {:?}", ts, data);
+        midi.dispatch_midi(data, ts);
+    }, ());
+    if let Err(e) = result {
+        println!("error connecting to midi: {:?}", e);
+    }
+
+    event_loop.run(move |_stream_id, stream_data| {
+        match stream_data {
+            StreamData::Output { buffer: UnknownTypeOutputBuffer::F32(mut buf) } => {
+                let mut buf_slice = buf.deref_mut();
+                let mut i = 0;
+                let mut timestamp = time::precise_time_ns();
+                while i < buf_slice.len() {
+                    // should let the graph generate stereo
+                    let buf = worker.work(timestamp)[0].get();
+                    for j in 0..N_SAMPLES_PER_CHUNK {
+                        buf_slice[i + j * 2] = buf[j];
+                        buf_slice[i + j * 2 + 1] = buf[j];
+                    }
+
+                    // TODO: calculate properly, magic value is 64 * 1e9 / 44_100
+                    timestamp += 1451247 * (N_SAMPLES_PER_CHUNK as u64) / 64;
+                    i += N_SAMPLES_PER_CHUNK * 2;
+                }
+            }
+            _ => panic!("Can't handle output buffer format"),
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn run_mac(worker: Worker, tx: Sender<Message>) {
+    let _audio_unit = run_audio_unit(worker).unwrap();
 
     let source_index = 0;
     if let Some(source) = coremidi::Source::from_index(source_index) {
@@ -173,10 +250,11 @@ fn main() {
         input_port.disconnect_source(&source).unwrap();
     } else {
         println!("No midi available");
-    }
+    }    
 }
 
-fn run(mut worker: Worker) -> Result<AudioUnit, coreaudio::Error> {
+#[cfg(target_os = "macos")]
+fn run_audio_unit(mut worker: Worker) -> Result<AudioUnit, coreaudio::Error> {
 
     // Construct an Output audio unit that delivers audio to the default output device.
     let mut audio_unit = AudioUnit::new(IOType::DefaultOutput)?;
@@ -201,7 +279,8 @@ fn run(mut worker: Worker) -> Result<AudioUnit, coreaudio::Error> {
                     channel[i + j] = buf[j];
                 }
             }
-            timestamp += 1451247;  // 64 * 1e9 / 44_100
+            // TODO: calculate properly, magic value is 64 * 1e9 / 44_100
+            timestamp += 1451247 * (N_SAMPLES_PER_CHUNK as u64) / 64;
             i += N_SAMPLES_PER_CHUNK;
         }
         Ok(())

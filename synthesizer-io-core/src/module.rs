@@ -16,7 +16,7 @@
 
 use std::any::Any;
 
-pub const N_SAMPLES_PER_CHUNK: usize = 64;
+pub const N_SAMPLES_PER_CHUNK: usize = 32;
 
 pub struct Buffer {
     // TODO: simd alignment
@@ -46,7 +46,7 @@ impl Default for Buffer {
     }
 }
 
-pub trait Module: MyToAny {
+pub trait Module: MyToAny + Send {
     /// Report the number of buffers this module is expected to generate.
     fn n_bufs_out(&self) -> usize { 0 }
 

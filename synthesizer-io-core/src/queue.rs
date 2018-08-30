@@ -57,6 +57,8 @@ pub struct Item<T> {
 }
 // TODO: it would be great to disable drop
 
+unsafe impl<T: Send> Send for Item<T> {}
+
 impl<T> Item<T> {
     pub fn make_item(payload: T) -> Item<T> {
         let ptr = Box::into_raw(Box::new(Node {
@@ -87,13 +89,13 @@ pub struct Queue<T> {
 
 // implement send (so queue can be transferred into worker thread)
 // but not sync (to enforce spsc, which avoids ABA)
-unsafe impl<T> Send for Sender<T> {}
+unsafe impl<T: Send> Send for Sender<T> {}
 pub struct Sender<T> {
     queue: Arc<Queue<T>>,
     _marker: PhantomData<*const T>,
 }
 
-unsafe impl<T> Send for Receiver<T> {}
+unsafe impl<T: Send> Send for Receiver<T> {}
 pub struct Receiver<T> {
     queue: Arc<Queue<T>>,
     _marker: PhantomData<*const T>,
