@@ -1,7 +1,6 @@
 # Synthesizer IO
 
-Hopefully, this will become a synthesizer written in Rust. At the moment, it's
-experimental bits of technology toward that end.
+Development has moved to [https://github.com/raphlinus/synthesizer-io](raphlinus/synthesizer-io).
 
 ## Disclaimer
 
