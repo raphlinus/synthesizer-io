@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A lock-free queue suitable for real-time audio threads
+//! A lock-free queue suitable for real-time audio threads.
 
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::atomic::Ordering::{Relaxed, Release};
 use std::sync::Arc;
 use std::thread;
 use std::ptr;
+use std::ptr::NonNull;
 use std::ops::{Deref, DerefMut};
 use std::marker::PhantomData;
 use std::time;
@@ -27,18 +28,17 @@ use std::time;
 
 struct Node<T> {
     payload: T,
-    child: *mut Node<T>,
+    child: Option<NonNull<Node<T>>>,
 }
 
 impl<T> Node<T> {
     // reverse singly-linked list in place
-    unsafe fn reverse(mut p: *mut Node<T>) -> *mut Node<T> {
-        let mut q = ptr::null_mut();
-        while !p.is_null() {
-            let element = p;
-            p = (*element).child;
-            (*element).child = q;
-            q = element;
+    unsafe fn reverse(mut p: Option<NonNull<Node<T>>>) -> Option<NonNull<Node<T>>> {
+        let mut q = None;
+        while let Some(mut element) = p {
+            p = element.as_ref().child;
+            element.as_mut().child = q;
+            q = Some(element);
         }
         q
     }
@@ -51,21 +51,24 @@ impl<T> Node<T> {
 /// Note: in the current implementation, dropping an `Item` just leaks the
 /// storage.
 pub struct Item<T> {
-    ptr: *mut Node<T>,
-    // TODO: can use NonZero once that stabilizes, for optimization
-    // TODO: does this need a PhantomData marker?
+    ptr: NonNull<Node<T>>,
 }
 // TODO: it would be great to disable drop
 
 unsafe impl<T: Send> Send for Item<T> {}
 
 impl<T> Item<T> {
+    /// Create an `Item` for the given value. This function allocates and is
+    /// very similar to `Box::new()`.
     pub fn make_item(payload: T) -> Item<T> {
         let ptr = Box::into_raw(Box::new(Node {
             payload: payload,
-            child: ptr::null_mut(),
+            child: None,
         }));
-        Item { ptr: ptr }
+        // TODO: use Box::into_raw_non_null when it stabilizes
+        unsafe {
+            Item { ptr: NonNull::new_unchecked(ptr) }
+        }
     }
 }
 
@@ -73,35 +76,62 @@ impl<T> Deref for Item<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        unsafe { &(*self.ptr).payload }
+        unsafe { &self.ptr.as_ref().payload }
     }
 }
 
 impl<T> DerefMut for Item<T> {
     fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut (*self.ptr).payload }
+        unsafe { &mut self.ptr.as_mut().payload }
     }
 }
+
+/// A lock-free queue specialized for audio applications.
+///
+/// The special super-power of this implementation is that it allows all allocation
+/// and deallocation to be done on _one_ side (either producer or consumer) of the
+/// queue. Thus, an audio processing thread can be rigorously nonblocking even as
+/// it receives dynamically allocated messages. Instead of dropping the messages, it
+/// sends them through a return-path queue.
+///
+/// Following Dmitry Vyukov's
+/// [classification](http://www.1024cores.net/home/lock-free-algorithms/queues),
+/// this queue is MPSC, linked-list-based, intrusive, unbounded, does not require
+/// GC, and does not have support for message priorities. It provides per-producer
+/// FIFO, has lockfree producers and waitfree consumers.
+///
+/// Note that Vyukov's
+/// [intrusive mpsc queue](http://www.1024cores.net/home/lock-free-algorithms/queues/intrusive-mpsc-node-based-queue)
+/// might have better performance due to not needing to reverse. See
+/// [this thread](https://groups.google.com/forum/#!topic/lock-free/i0eE2-A7eIA) for discussion
+/// of performance and an argument why this design is in fact multi-producer safe.
 
 pub struct Queue<T> {
     head: AtomicPtr<Node<T>>,
 }
 
-// implement send (so queue can be transferred into worker thread)
-// but not sync (to enforce spsc, which avoids ABA)
+// implement Send (so queue can be transferred into worker thread)
 unsafe impl<T: Send> Send for Sender<T> {}
+// implement Sync, as queue is multi-producer safe.
+unsafe impl<T: Sync> Sync for Sender<T> {}
+
+/// The sender endpoint for a lock-free queue.
+#[derive(Clone)]
 pub struct Sender<T> {
     queue: Arc<Queue<T>>,
     _marker: PhantomData<*const T>,
 }
 
 unsafe impl<T: Send> Send for Receiver<T> {}
+// Note: could implement Sync and Clone, but value is marginal.
+
+/// The receiver endpoint for a lock-free queue.
 pub struct Receiver<T> {
     queue: Arc<Queue<T>>,
     _marker: PhantomData<*const T>,
 }
 
-impl<T: 'static> Sender<T> {
+impl<T: Send + 'static> Sender<T> {
     /// Enqueue a value into the queue. Note: this method allocates.
     pub fn send(&self, payload: T) {
         self.queue.send(payload);
@@ -114,7 +144,7 @@ impl<T: 'static> Sender<T> {
     }
 }
 
-impl<T: 'static> Receiver<T> {
+impl<T: Send + 'static> Receiver<T> {
     /// Dequeue all of the values waiting in the queue, and return an iterator
     /// that transfers ownership of those values. Note: the iterator
     /// will deallocate.
@@ -130,7 +160,7 @@ impl<T: 'static> Receiver<T> {
     }
 }
 
-impl<T: 'static> Queue<T> {
+impl<T: Send + 'static> Queue<T> {
     /// Create a new queue, and return endpoints for sending and receiving.
     pub fn new() -> (Sender<T>, Receiver<T>) {
         let queue = Arc::new(Queue {
@@ -162,11 +192,11 @@ impl<T: 'static> Queue<T> {
         unsafe { QueueItemIter(Node::reverse(self.pop_all())) }
     }
 
-    fn push_raw(&self, n: *mut Node<T>) {
+    fn push_raw(&self, mut n: NonNull<Node<T>>) {
         let mut old_ptr = self.head.load(Relaxed);
         loop {
-            unsafe { (*n).child = old_ptr; }
-            match self.head.compare_exchange_weak(old_ptr, n, Release, Relaxed) {
+            unsafe { n.as_mut().child = NonNull::new(old_ptr); }
+            match self.head.compare_exchange_weak(old_ptr, n.as_ptr(), Release, Relaxed) {
                 Ok(_) => break,
                 Err(old) => old_ptr = old,
             }
@@ -174,46 +204,43 @@ impl<T: 'static> Queue<T> {
     }
 
     // yields linked list in reverse order as sent
-    fn pop_all(&self) -> *mut Node<T> {
-        self.head.swap(ptr::null_mut(), Ordering::Acquire)
+    fn pop_all(&self) -> Option<NonNull<Node<T>>> {
+        NonNull::new(self.head.swap(ptr::null_mut(), Ordering::Acquire))
     }
 }
 
 /// An iterator yielding an `Item` for each value dequeued by a `recv_items` call.
-pub struct QueueItemIter<T: 'static>(*mut Node<T>);
+pub struct QueueItemIter<T: Send + 'static>(Option<NonNull<Node<T>>>);
 
-impl<T> Iterator for QueueItemIter<T> {
+impl<T: Send + 'static> Iterator for QueueItemIter<T> {
     type Item = Item<T>;
     fn next(&mut self) -> Option<Item<T>> {
         unsafe {
-            let result = self.0.as_mut();
-            if !self.0.is_null() {
-                self.0 = (*self.0).child;
-            }
-            result.map(|ptr| Item{ ptr: ptr })
+            self.0.map(|ptr| {
+                self.0 = ptr.as_ref().child;
+                Item { ptr }
+            })
         }
     }
 }
 
 /// An iterator yielding the values dequeued by a `recv` call.
-pub struct QueueMoveIter<T: 'static>(*mut Node<T>);
+pub struct QueueMoveIter<T: Send + 'static>(Option<NonNull<Node<T>>>);
 
-impl<T> Iterator for QueueMoveIter<T> {
+impl<T: Send + 'static> Iterator for QueueMoveIter<T> {
     type Item = T;
     fn next(&mut self) -> Option<T> {
         unsafe {
-            if self.0.is_null() {
-                None
-            } else {
-                let result = *Box::from_raw(self.0);
+            self.0.map(|ptr| {
+                let result = Box::from_raw(ptr.as_ptr());
                 self.0 = result.child;
-                Some(result.payload)
-            }
+                result.payload
+            })
         }
     }
 }
 
-impl<T: 'static> Drop for QueueMoveIter<T> {
+impl<T: Send + 'static> Drop for QueueMoveIter<T> {
     fn drop(&mut self) {
         self.all(|_| true);
     }
