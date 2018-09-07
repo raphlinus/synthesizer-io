@@ -27,6 +27,14 @@ use png::HasParameters;
 
 use synthesizer_io_spect::Spect;
 
+/// Approximate erf(x * sqrt(pi) / 2)
+#[allow(unused)]
+fn erf7(x: f32) -> f32 {
+    let xx = x * x;
+    let x = x + (0.24295 + (0.03395 /*+ 0.0104 * xx*/) * xx) * (x * xx);
+    x / (1.0 + x * x).sqrt()
+}
+
 fn gen_audio(len: usize) -> Vec<f32> {
     //(0..len).map(|i| ((i as f32).powi(2) * 1e-7).sin()).collect()
     let f = 440.0;
@@ -36,6 +44,7 @@ fn gen_audio(len: usize) -> Vec<f32> {
         let amp = 100.0 * (i * -4e-5).exp();
         let tone = (i * d).sin() * amp;
         tone.max(-1.0).min(1.0) as f32
+        //erf7(tone as f32)
         //(tone / (1.0 + tone * tone).sqrt()) as f32
         //tone.tanh() as f32
     }).collect()
