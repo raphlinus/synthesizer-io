@@ -116,9 +116,9 @@ unsafe impl<T: Send> Send for Sender<T> {}
 unsafe impl<T: Sync> Sync for Sender<T> {}
 
 /// The sender endpoint for a lock-free queue.
-#[derive(Clone)]
 pub struct Sender<T> {
     queue: Arc<Queue<T>>,
+    // TODO: is this phantom data necessary?
     _marker: PhantomData<*const T>,
 }
 
@@ -129,6 +129,15 @@ unsafe impl<T: Send> Send for Receiver<T> {}
 pub struct Receiver<T> {
     queue: Arc<Queue<T>>,
     _marker: PhantomData<*const T>,
+}
+
+impl<T: Send + 'static> Clone for Sender<T> {
+    fn clone(&self) -> Sender<T> {
+        Sender {
+            queue: self.queue.clone(),
+            _marker: Default::default(),
+        }
+    }
 }
 
 impl<T: Send + 'static> Sender<T> {

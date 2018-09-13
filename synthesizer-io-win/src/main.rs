@@ -16,10 +16,13 @@
 
 extern crate cpal;
 extern crate midir;
+extern crate direct2d;
 extern crate xi_win_ui;
 extern crate xi_win_shell;
 extern crate synthesizer_io_core;
 extern crate time;
+
+mod ui;
 
 use std::ops::DerefMut;
 use std::thread;
@@ -38,13 +41,19 @@ use xi_win_shell::win_main;
 use xi_win_shell::window::WindowBuilder;
 
 use xi_win_ui::{UiMain, UiState};
-use xi_win_ui::widget::Button;
+use xi_win_ui::widget::{Button, Column, EventForwarder};
+
+use ui::{NoteEvent, Piano};
 
 // This is cut'n'paste; we'll both continue developing it and factor things out across
 // the various modules.
 struct Midi {
     tx: Sender<Message>,
     cur_note: Option<u8>,
+}
+
+struct SynthState {
+    midi: Midi,
 }
 
 impl Midi {
@@ -115,11 +124,26 @@ impl Midi {
             }
         }
     }
+
+    fn dispatch_note_event(&mut self, note_event: &NoteEvent) {
+        let mut data = [0u8; 3];
+        data[0] = if note_event.down { 0x90 } else { 0x80 };
+        data[1] = note_event.note;
+        data[2] = note_event.velocity;
+        self.dispatch_midi(&data, time::precise_time_ns());
+    }
+}
+
+impl SynthState {
+    fn action(&mut self, note_event: &NoteEvent) {
+        self.midi.dispatch_note_event(note_event);
+    }
 }
 
 fn main() {
-    let (mut worker, tx, rx) = Worker::create(1024);
     xi_win_shell::init();
+    let (mut worker, tx, rx) = Worker::create(1024);
+    let mut synth_state = SynthState { midi: Midi::new(tx.clone()) };
 
     let module = Box::new(modules::Saw::new(44_100.0));
     worker.handle_node(Node::create(module, 1, [], [(5, 0)]));
@@ -149,7 +173,16 @@ fn main() {
     let mut builder = WindowBuilder::new();
     let mut state = UiState::new();
     let button = Button::new("Press me").ui(&mut state);
-    state.set_root(button);
+    let piano = Piano::new().ui(&mut state);
+    let column = Column::new().ui(&[button, piano], &mut state);
+    let forwarder = EventForwarder::<NoteEvent>::new().ui(column, &mut state);
+    state.add_listener(piano, move |event: &mut NoteEvent, mut ctx| {
+        ctx.poke_up(event);
+    });
+    state.add_listener(forwarder, move |action: &mut NoteEvent, _ctx| {
+        synth_state.action(action);
+    });
+    state.set_root(forwarder);
     builder.set_handler(Box::new(UiMain::new(state)));
     builder.set_title("Synthesizer IO");
     let window = builder.build().unwrap();

@@ -525,6 +525,7 @@ name = "synthesizer-io-win"
 version = "0.1.0"
 dependencies = [
  "cpal 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "direct2d 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "midir 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "synthesizer-io-core 0.1.0",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
