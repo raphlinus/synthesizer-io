@@ -41,7 +41,7 @@ use xi_win_shell::win_main;
 use xi_win_shell::window::WindowBuilder;
 
 use xi_win_ui::{UiMain, UiState};
-use xi_win_ui::widget::{Button, Column, EventForwarder};
+use xi_win_ui::widget::{Column, EventForwarder, Label};
 
 use ui::{NoteEvent, Piano};
 
@@ -172,7 +172,7 @@ fn main() {
     let mut run_loop = win_main::RunLoop::new();
     let mut builder = WindowBuilder::new();
     let mut state = UiState::new();
-    let button = Button::new("Press me").ui(&mut state);
+    let button = Label::new("Synthesizer IO").ui(&mut state);
     let piano = Piano::new().ui(&mut state);
     let column = Column::new().ui(&[button, piano], &mut state);
     let forwarder = EventForwarder::<NoteEvent>::new().ui(column, &mut state);
