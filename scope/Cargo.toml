@@ -1,0 +1,11 @@
+[package]
+name = "synthesize-scope"
+version = "0.1.0"
+authors = ["Raph Levien <raph.levien@gmail.com>"]
+license = "Apache-2.0"
+description = "Oscilloscope style waveform visualization"
+
+[dependencies]
+
+[dev-dependencies]
+png = "0.12.0"
