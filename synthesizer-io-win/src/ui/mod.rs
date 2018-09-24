@@ -15,5 +15,7 @@
 //! UI components and logic for the synthesizer.
 
 mod piano;
+mod patcher;
 
 pub use self::piano::{Piano, NoteEvent};
+pub use self::patcher::Patcher;

@@ -21,6 +21,7 @@ extern crate xi_win_ui;
 extern crate xi_win_shell;
 extern crate synthesizer_io_core;
 extern crate time;
+extern crate itertools;
 
 mod ui;
 
@@ -43,7 +44,7 @@ use xi_win_shell::window::WindowBuilder;
 use xi_win_ui::{UiMain, UiState};
 use xi_win_ui::widget::{Column, EventForwarder, Label};
 
-use ui::{NoteEvent, Piano};
+use ui::{NoteEvent, Patcher, Piano};
 
 // This is cut'n'paste; we'll both continue developing it and factor things out across
 // the various modules.
@@ -173,8 +174,9 @@ fn main() {
     let mut builder = WindowBuilder::new();
     let mut state = UiState::new();
     let button = Label::new("Synthesizer IO").ui(&mut state);
+    let patcher = Patcher::new().ui(&mut state);
     let piano = Piano::new().ui(&mut state);
-    let column = Column::new().ui(&[button, piano], &mut state);
+    let column = Column::new().ui(&[button, patcher, piano], &mut state);
     let forwarder = EventForwarder::<NoteEvent>::new().ui(column, &mut state);
     state.add_listener(piano, move |event: &mut NoteEvent, mut ctx| {
         ctx.poke_up(event);
