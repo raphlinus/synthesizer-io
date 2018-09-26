@@ -20,7 +20,8 @@ use itertools::Itertools;
 
 use direct2d::RenderTarget;
 use direct2d::brush::SolidColorBrush;
-use direct2d::enums::AntialiasMode;
+use direct2d::enums::{AntialiasMode, CapStyle};
+use direct2d::stroke_style::StrokeStyleBuilder;
 
 use xi_win_ui::{BoxConstraints, Geometry, LayoutResult, UiInner};
 use xi_win_ui::{Id, HandlerCtx, LayoutCtx, PaintCtx};
@@ -45,11 +46,12 @@ pub struct WireGrid {
 
 impl Widget for Patcher {
     fn paint(&mut self, paint_ctx: &mut PaintCtx, geom: &Geometry) {
+        let rounded = StrokeStyleBuilder::new(paint_ctx.d2d_factory())
+            .with_start_cap(CapStyle::Round)
+            .with_end_cap(CapStyle::Round)
+            .build().unwrap();
         let rt = paint_ctx.render_target();
-        // TODO: clip to geom
-        rt.push_axis_aligned_clip((geom.pos.0, geom.pos.1,
-                geom.pos.0 + geom.size.0, geom.pos.1 + geom.size.1),
-            AntialiasMode::Aliased);
+        rt.push_axis_aligned_clip(geom, AntialiasMode::Aliased);
         let grid_color = SolidColorBrush::create(rt).with_color(0x405070).build().unwrap();
         let wire_color = SolidColorBrush::create(rt).with_color(0x808080).build().unwrap();
         let x0 = geom.pos.0 + self.offset.0;
@@ -68,7 +70,7 @@ impl Widget for Patcher {
             let x = x0 + (*i as f32 + 0.5) * self.scale;
             let y = y0 + (*j as f32 + 0.5) * self.scale;
             let (x1, y1) = if *vert { (x, y + self.scale) } else { (x + self.scale, y) };
-            rt.draw_line((x, y), (x1, y1), &wire_color, 3.0, None);
+            rt.draw_line((x, y), (x1, y1), &wire_color, 3.0, Some(&rounded));
         }
         rt.pop_axis_aligned_clip();
     }
