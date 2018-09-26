@@ -197,10 +197,10 @@ dependencies = [
 
 [[package]]
 name = "direct2d"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "directwrite 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "dxgi 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "directwrite"
-version = "0.1.2"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "winapi 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -535,7 +535,7 @@ name = "synthesizer-io-win"
 version = "0.1.0"
 dependencies = [
  "cpal 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "direct2d 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "direct2d 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "midir 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "synthesizer-io-core 0.1.0",
@@ -674,8 +674,8 @@ name = "xi-win-shell"
 version = "0.1.0"
 source = "git+https://github.com/xi-editor/xi-win#ee7961eb4a8af99b284eda7f3da499dabae9700f"
 dependencies = [
- "direct2d 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "directwrite 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "direct2d 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -687,8 +687,8 @@ name = "xi-win-ui"
 version = "0.1.0"
 source = "git+https://github.com/xi-editor/xi-win#ee7961eb4a8af99b284eda7f3da499dabae9700f"
 dependencies = [
- "direct2d 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "directwrite 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "direct2d 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "xi-win-shell 0.1.0 (git+https://github.com/xi-editor/xi-win)",
 ]
@@ -716,8 +716,8 @@ dependencies = [
 "checksum coremidi 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "33326bbe31e4f0102c694281998365bf37ecd7ed08d2993ded0c19c57579cbed"
 "checksum coremidi-sys 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "07f05827cebb30dcd539ff1ac9bf6764f574a15fa147f8572f99d7617142f95e"
 "checksum cpal 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d58ae1ed6536b1b233f5e3aeb6997a046ddb4d05e3f61701b58a92eb254a829e"
-"checksum direct2d 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a7d8df8b3c34926aa9505d76253ea940569abe05a5d60545dd77d61efbb52e34"
-"checksum directwrite 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "23ce50b0074bd751d4e2e91a88180de922ffb9f032e0bffebfe0f20c5dbd2b1c"
+"checksum direct2d 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "c81a1b6c27b058f188138f78998e502460b38bd6adbf37f93ed8ac7b73da4a8e"
+"checksum directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8cdcd739e9351c411b8caf5cab32a27c818cfe06260595da121382ecdd22083d"
 "checksum dxgi 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1639bbfd6765e92a40267d217a7acbac5b49320b68013f39a8e4376aa8c1e091"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3ddf21e73e016298f5cb37d6ef8e8da8e39f91f9ec8b0df44b7deb16a9f8cd5b"
