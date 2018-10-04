@@ -23,6 +23,7 @@ extern crate synthesizer_io_core;
 extern crate time;
 extern crate itertools;
 
+mod grid;
 mod ui;
 
 use std::ops::DerefMut;
