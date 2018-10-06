@@ -26,7 +26,7 @@ use xi_win_ui::{Id, HandlerCtx, LayoutCtx, PaintCtx};
 use xi_win_ui::MouseEvent;
 use xi_win_ui::widget::{MouseButton, Widget};
 
-use grid::{ModuleGrid, ModuleInstance, ModuleSpec, WireGrid};
+use grid::{Delta, ModuleGrid, ModuleInstance, ModuleSpec, WireDelta, WireGrid};
 
 pub struct Patcher {
     size: (f32, f32),
@@ -124,9 +124,14 @@ impl Widget for Patcher {
                     if let Some(loc) = self.xy_to_cell(xc, yc) {
                         inst.loc = loc;
                         if self.is_module_ok(&inst) {
+                            let delta = vec![Delta::Module(inst)];
+                            self.apply_and_send_delta(delta, ctx);
+                            /*
                             println!("placing {} at {:?}", inst.spec.name, inst.loc);
                             self.modules.add(inst);
+                            ctx.send_event(vec![Delta::Module]);
                             ctx.invalidate();
+                            */
                         }
                     }
                 }
@@ -139,17 +144,17 @@ impl Widget for Patcher {
         match self.mode {
             PatcherMode::Wire => {
                 if let Some((x0, y0)) = self.last_xy {
+                    let mut delta = Vec::new();
                     let pts = self.line_quantize(x0, y0, x, y);
                     for ((x0, y0), (x1, y1)) in pts.iter().tuple_windows() {
                         let grid_ix = WireGrid::unit_line_to_grid_ix(*x0, *y0, *x1, *y1);
                         if self.draw_mode.is_none() {
                             self.draw_mode = Some(!self.grid.is_set(grid_ix));
                         }
-                        self.grid.set(grid_ix, self.draw_mode.unwrap());
+                        let val = self.draw_mode.unwrap();
+                        delta.push(Delta::Wire(WireDelta { grid_ix, val }));
                     }
-                    if pts.len() > 1 {
-                        ctx.invalidate();
-                    }
+                    self.apply_and_send_delta(delta, ctx);
                     self.last_xy = Some((x, y))
                 }
             }
@@ -359,6 +364,27 @@ impl Patcher {
 
     fn is_module_ok(&self, inst: &ModuleInstance) -> bool {
         !self.modules.is_conflict(inst)
+    }
+
+    fn apply_and_send_delta(&mut self, delta: Vec<Delta>, ctx: &mut HandlerCtx) {
+        if !delta.is_empty() {
+            self.apply_delta(&delta);
+            ctx.send_event(delta);
+            ctx.invalidate();
+        }
+    }
+
+    fn apply_delta(&mut self, delta: &[Delta]) {
+        for d in delta {
+            match d {
+                Delta::Wire(WireDelta { grid_ix, val }) => {
+                    self.grid.set(*grid_ix, *val);
+                }
+                Delta::Module(inst) => {
+                    self.modules.add(inst.clone());
+                }
+            }
+        }
     }
 }
 

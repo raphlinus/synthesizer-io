@@ -672,7 +672,7 @@ dependencies = [
 [[package]]
 name = "xi-win-shell"
 version = "0.1.0"
-source = "git+https://github.com/xi-editor/xi-win#2899a74f732917aa5068bf641d7f8a57d595bd57"
+source = "git+https://github.com/xi-editor/xi-win#4bd08e6744edf2725b46e31c5537f7f1894acbf4"
 dependencies = [
  "direct2d 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -685,7 +685,7 @@ dependencies = [
 [[package]]
 name = "xi-win-ui"
 version = "0.1.0"
-source = "git+https://github.com/xi-editor/xi-win#2899a74f732917aa5068bf641d7f8a57d595bd57"
+source = "git+https://github.com/xi-editor/xi-win#4bd08e6744edf2725b46e31c5537f7f1894acbf4"
 dependencies = [
  "direct2d 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",

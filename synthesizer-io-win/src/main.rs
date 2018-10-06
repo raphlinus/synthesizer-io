@@ -45,6 +45,7 @@ use xi_win_shell::window::WindowBuilder;
 use xi_win_ui::{UiMain, UiState};
 use xi_win_ui::widget::{Column, EventForwarder, Label};
 
+use grid::Delta;
 use ui::{NoteEvent, Patcher, Piano};
 
 // This is cut'n'paste; we'll both continue developing it and factor things out across
@@ -179,6 +180,9 @@ fn main() {
     let piano = Piano::new().ui(&mut state);
     let column = Column::new().ui(&[button, patcher, piano], &mut state);
     let forwarder = EventForwarder::<NoteEvent>::new().ui(column, &mut state);
+    state.add_listener(patcher, move |delta: &mut Vec<Delta>, _ctx| {
+        println!("delta: {:?}", delta);
+    });
     state.add_listener(piano, move |event: &mut NoteEvent, mut ctx| {
         ctx.poke_up(event);
     });

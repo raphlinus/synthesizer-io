@@ -26,16 +26,30 @@ pub struct ModuleGrid {
     modules: Vec<ModuleInstance>,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModuleInstance {
     pub loc: (u16, u16),
     pub spec: ModuleSpec,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModuleSpec {
     pub size: (u16, u16),
     pub name: String,
+}
+
+#[derive(Debug)]
+pub enum Delta {
+    Wire(WireDelta),
+    /// Add a module. Note: we need to encode moving and deleting as well, and
+    /// probably have a unique id mechanism. Later.
+    Module(ModuleInstance),
+}
+
+#[derive(Debug)]
+pub struct WireDelta {
+    pub grid_ix: (u16, u16, bool),
+    pub val: bool,
 }
 
 impl WireGrid {
