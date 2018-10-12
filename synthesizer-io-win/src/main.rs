@@ -28,15 +28,16 @@ mod ui;
 
 use std::ops::DerefMut;
 use std::thread;
+use std::sync::{Arc, Mutex};
 
 use cpal::{EventLoop, StreamData, UnknownTypeOutputBuffer};
 use midir::{MidiInput, MidiInputConnection};
 
 use synthesizer_io_core::modules;
 
+use synthesizer_io_core::engine::{Engine, NoteEvent};
 use synthesizer_io_core::worker::Worker;
-use synthesizer_io_core::queue::Sender;
-use synthesizer_io_core::graph::{Node, Message, SetParam, Note};
+use synthesizer_io_core::graph::Node;
 use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
 
 use xi_win_shell::win_main;
@@ -46,131 +47,37 @@ use xi_win_ui::{UiMain, UiState};
 use xi_win_ui::widget::{Column, EventForwarder, Label};
 
 use grid::Delta;
-use ui::{NoteEvent, Patcher, Piano};
-
-// This is cut'n'paste; we'll both continue developing it and factor things out across
-// the various modules.
-struct Midi {
-    tx: Sender<Message>,
-    cur_note: Option<u8>,
-}
+use ui::{Patcher, Piano};
 
 struct SynthState {
-    midi: Midi,
-}
-
-impl Midi {
-    fn new(tx: Sender<Message>) -> Midi {
-        Midi {
-            tx: tx,
-            cur_note: None,
-        }
-    }
-
-    fn send(&self, msg: Message) {
-        self.tx.send(msg);
-    }
-
-    fn set_ctrl_const(&mut self, value: u8, lo: f32, hi: f32, ix: usize, ts: u64) {
-        let value = lo + value as f32 * (1.0/127.0) * (hi - lo);
-        let param = SetParam {
-            ix: ix,
-            param_ix: 0,
-            val: value,
-            timestamp: ts,
-        };
-        self.send(Message::SetParam(param));
-    }
-
-    fn send_note(&mut self, ixs: Vec<usize>, midi_num: f32, velocity: f32, on: bool,
-        ts: u64)
-    {
-        let note = Note {
-            ixs: ixs.into_boxed_slice(),
-            midi_num: midi_num,
-            velocity: velocity,
-            on: on,
-            timestamp: ts,
-        };
-        self.send(Message::Note(note));
-    }
-
-    fn dispatch_midi(&mut self, data: &[u8], ts: u64) {
-        let mut i = 0;
-        while i < data.len() {
-            if data[i] == 0xb0 {
-                let controller = data[i + 1];
-                let value = data[i + 2];
-                match controller {
-                    1 => self.set_ctrl_const(value, 0.0, 22_000f32.log2(), 3, ts),
-                    2 => self.set_ctrl_const(value, 0.0, 0.995, 4, ts),
-                    3 => self.set_ctrl_const(value, 0.0, 22_000f32.log2(), 5, ts),
-
-                    5 => self.set_ctrl_const(value, 0.0, 10.0, 11, ts),
-                    6 => self.set_ctrl_const(value, 0.0, 10.0, 12, ts),
-                    7 => self.set_ctrl_const(value, 0.0, 6.0, 13, ts),
-                    8 => self.set_ctrl_const(value, 0.0, 10.0, 14, ts),
-                    _ => println!("don't have handler for controller {}", controller),
-                }
-                i += 3;
-            } else if data[i] == 0x90 || data[i] == 0x80 {
-                let midi_num = data[i + 1];
-                let velocity = data[i + 2];
-                let on = data[i] == 0x90 && velocity > 0;
-                if on || self.cur_note == Some(midi_num) {
-                    self.send_note(vec![5, 7], midi_num as f32, velocity as f32, on, ts);
-                    self.cur_note = if on { Some(midi_num) } else { None }
-                }
-                i += 3;
-            } else {
-                break;
-            }
-        }
-    }
-
-    fn dispatch_note_event(&mut self, note_event: &NoteEvent) {
-        let mut data = [0u8; 3];
-        data[0] = if note_event.down { 0x90 } else { 0x80 };
-        data[1] = note_event.note;
-        data[2] = note_event.velocity;
-        self.dispatch_midi(&data, time::precise_time_ns());
-    }
+    // We probably want to move to the synth state fully owning the engine, and
+    // things like midi being routed through the synth state. But for now this
+    // should work pretty well.
+    engine: Arc<Mutex<Engine>>,
 }
 
 impl SynthState {
     fn action(&mut self, note_event: &NoteEvent) {
-        self.midi.dispatch_note_event(note_event);
+        let mut engine = self.engine.lock().unwrap();
+        engine.dispatch_note_event(note_event);
     }
 }
 
 fn main() {
     xi_win_shell::init();
     let (mut worker, tx, rx) = Worker::create(1024);
-    let mut synth_state = SynthState { midi: Midi::new(tx.clone()) };
+    // TODO: get sample rate from cpal
+    let mut engine = Engine::new(48_000.0, rx, tx);
+    engine.init_monosynth();
 
-    let module = Box::new(modules::Saw::new(44_100.0));
-    worker.handle_node(Node::create(module, 1, [], [(5, 0)]));
-    let module = Box::new(modules::SmoothCtrl::new(880.0f32.log2()));
-    worker.handle_node(Node::create(module, 3, [], []));
-    let module = Box::new(modules::SmoothCtrl::new(0.5));
-    worker.handle_node(Node::create(module, 4, [], []));
-    let module = Box::new(modules::NotePitch::new());
-    worker.handle_node(Node::create(module, 5, [], []));
-    let module = Box::new(modules::Biquad::new(44_100.0));
-    worker.handle_node(Node::create(module, 6, [(1,0)], [(3, 0), (4, 0)]));
-    let module = Box::new(modules::Adsr::new());
-    worker.handle_node(Node::create(module, 7, [], vec![(11, 0), (12, 0), (13, 0), (14, 0)]));
-    let module = Box::new(modules::Gain::new());
-    worker.handle_node(Node::create(module, 0, [(6, 0)], [(7, 0)]));
+    let engine = Arc::new(Mutex::new(engine));
 
-    let module = Box::new(modules::SmoothCtrl::new(5.0));
-    worker.handle_node(Node::create(module, 11, [], []));
-    let module = Box::new(modules::SmoothCtrl::new(5.0));
-    worker.handle_node(Node::create(module, 12, [], []));
-    let module = Box::new(modules::SmoothCtrl::new(4.0));
-    worker.handle_node(Node::create(module, 13, [], []));
-    let module = Box::new(modules::SmoothCtrl::new(5.0));
-    worker.handle_node(Node::create(module, 14, [], []));
+    let mut synth_state = SynthState { engine: engine.clone() };
+
+    // Set up working graph; will probably be replaced by the engine before
+    // the first audio callback runs.
+    let module = Box::new(modules::Sum::new());
+    worker.handle_node(Node::create(module, 0, [], []));
 
     let mut run_loop = win_main::RunLoop::new();
     let mut builder = WindowBuilder::new();
@@ -193,20 +100,19 @@ fn main() {
     builder.set_handler(Box::new(UiMain::new(state)));
     builder.set_title("Synthesizer IO");
     let window = builder.build().unwrap();
-    let _midi_connection = setup_midi(tx);  // keep from being dropped
+    let _midi_connection = setup_midi(engine);  // keep from being dropped
     thread::spawn(move || run_cpal(worker));
     window.show();
     run_loop.run();
 }
 
-fn setup_midi(tx: Sender<Message>) -> Option<MidiInputConnection<()>> {
-    let mut midi = Midi::new(tx);
-
+fn setup_midi(engine: Arc<Mutex<Engine>>) -> Option<MidiInputConnection<()>> {
     let mut midi_in = MidiInput::new("midir input").expect("can't create midi input");
     midi_in.ignore(::midir::Ignore::None);
     let result = midi_in.connect(0, "in", move |_ts, data, _| {
         //println!("{}, {:?}", ts, data);
-        midi.dispatch_midi(data, time::precise_time_ns());
+        let mut engine = engine.lock().unwrap();
+        engine.dispatch_midi(data, time::precise_time_ns());
     }, ());
     if let Err(ref e) = result {
         println!("error connecting to midi: {:?}", e);

@@ -17,5 +17,5 @@
 mod piano;
 mod patcher;
 
-pub use self::piano::{Piano, NoteEvent};
+pub use self::piano::Piano;
 pub use self::patcher::Patcher;

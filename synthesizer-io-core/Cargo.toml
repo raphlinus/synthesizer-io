@@ -7,3 +7,4 @@ description = "Computational core for sound synthesis."
 
 [dependencies]
 lazy_static = "1.0"
+time = "0.1"

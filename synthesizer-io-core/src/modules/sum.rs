@@ -18,6 +18,12 @@ use module::{Module, Buffer};
 
 pub struct Sum;
 
+impl Sum {
+    pub fn new() -> Sum {
+        Sum
+    }
+}
+
 impl Module for Sum {
     fn n_bufs_out(&self) -> usize { 1 }
 

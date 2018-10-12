@@ -17,7 +17,10 @@
 #[macro_use]
 extern crate lazy_static;
 
+extern crate time;
+
 pub mod queue;
+pub mod engine;
 pub mod graph;
 pub mod module;
 pub mod modules;

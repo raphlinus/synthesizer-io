@@ -22,6 +22,8 @@ use xi_win_ui::{Id, HandlerCtx, LayoutCtx, PaintCtx};
 use xi_win_ui::MouseEvent;
 use xi_win_ui::widget::Widget;
 
+use synthesizer_io_core::engine::NoteEvent;
+
 pub struct Piano {
     start_note: u8,
     end_note: u8,
@@ -33,13 +35,6 @@ pub struct Piano {
     // Note: we could probably eliminate this if we had access to size
     // in HandlerCtx. Alternatively, we could precompute width_scale.
     size: (f32, f32),
-}
-
-#[derive(Clone)]
-pub struct NoteEvent {
-    pub down: bool,
-    pub note: u8,
-    pub velocity: u8,
 }
 
 const OCTAVE_WIDTH: i32 = 14;
