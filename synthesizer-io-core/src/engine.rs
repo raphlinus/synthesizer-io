@@ -14,10 +14,13 @@
 
 //! Interface for the audio engine.
 
-use queue::{Receiver, Sender};
-use graph::{Node, Message, SetParam, Note};
-use modules;
 use time;
+
+use id_allocator::IdAllocator;
+use graph::{IntoBoxedSlice, Message, Node, Note, SetParam};
+use module::Module;
+use modules;
+use queue::{Receiver, Sender};
 
 /// The interface from the application to the audio engine.
 ///
@@ -36,6 +39,11 @@ struct Core {
     sample_rate: f32,
     rx: Receiver<Message>,
     tx: Sender<Message>,
+
+    id_alloc: IdAllocator,
+
+    // List of nodes that generate output. Maybe should be node, channel pairs.
+    output_bus: Vec<usize>,
 }
 
 #[derive(Clone)]
@@ -46,10 +54,26 @@ pub struct NoteEvent {
 }
 
 struct Midi {
+    control_map: ControlMap,
     cur_note: Option<u8>,
 }
 
+struct ControlMap {
+    cutoff: usize,
+    reso: usize,
+
+    attack: usize,
+    decay: usize,
+    sustain: usize,
+    release: usize,
+
+    note_receivers: Vec<usize>,
+}
+
 impl Engine {
+    /// Create a new engine instance.
+    ///
+    /// This call takes ownership of channels to and from the worker.
     pub fn new(sample_rate: f32, rx: Receiver<Message>, tx: Sender<Message>) -> Engine {
         let core = Core::new(sample_rate, rx, tx);
         Engine { core, midi: None }
@@ -57,8 +81,8 @@ impl Engine {
 
     /// Initialize the engine with a simple mono synth.
     pub fn init_monosynth(&mut self) {
-        self.core.init_monosynth();
-        self.midi = Some(Midi::new());
+        let control_map = self.core.init_monosynth();
+        self.midi = Some(Midi::new(control_map));
     }
 
     /// Handle a MIDI event.
@@ -75,6 +99,8 @@ impl Engine {
         }
     }
 
+    /// Poll the return queue. Right now this just returns the number of items
+    /// retrieved, but the interface will change to include monitoring.
     pub fn poll_rx(&mut self) -> usize {
         self.core.poll_rx()
     }
@@ -82,33 +108,50 @@ impl Engine {
 
 impl Core {
     fn new(sample_rate: f32, rx: Receiver<Message>, tx: Sender<Message>) -> Core {
-        Core { sample_rate, rx, tx }
+        let mut id_alloc = IdAllocator::new();
+        id_alloc.reserve(0);
+        let output_bus = Vec::new();
+        Core { sample_rate, rx, tx, id_alloc, output_bus }
     }
 
-    fn init_monosynth(&mut self) {
-        let module = Box::new(modules::Saw::new(self.sample_rate));
-        self.send_node(Node::create(module, 1, [], [(5, 0)]));
-        let module = Box::new(modules::SmoothCtrl::new(880.0f32.log2()));
-        self.send_node(Node::create(module, 3, [], []));
-        let module = Box::new(modules::SmoothCtrl::new(0.5));
-        self.send_node(Node::create(module, 4, [], []));
-        let module = Box::new(modules::NotePitch::new());
-        self.send_node(Node::create(module, 5, [], []));
-        let module = Box::new(modules::Biquad::new(self.sample_rate));
-        self.send_node(Node::create(module, 6, [(1,0)], [(3, 0), (4, 0)]));
-        let module = Box::new(modules::Adsr::new());
-        self.send_node(Node::create(module, 7, [], vec![(11, 0), (12, 0), (13, 0), (14, 0)]));
-        let module = Box::new(modules::Gain::new());
-        self.send_node(Node::create(module, 0, [(6, 0)], [(7, 0)]));
+    pub fn create_node<B1: IntoBoxedSlice<(usize, usize)>,
+                       B2: IntoBoxedSlice<(usize, usize)>,
+                       M: Module + 'static>
+        (&mut self, module: M, in_buf_wiring: B1, in_ctrl_wiring: B2) -> usize
+    {
+        let id = self.id_alloc.alloc();
+        self.send_node(Node::create(Box::new(module), id, in_buf_wiring, in_ctrl_wiring));
+        id
+    }
 
-        let module = Box::new(modules::SmoothCtrl::new(5.0));
-        self.send_node(Node::create(module, 11, [], []));
-        let module = Box::new(modules::SmoothCtrl::new(5.0));
-        self.send_node(Node::create(module, 12, [], []));
-        let module = Box::new(modules::SmoothCtrl::new(4.0));
-        self.send_node(Node::create(module, 13, [], []));
-        let module = Box::new(modules::SmoothCtrl::new(5.0));
-        self.send_node(Node::create(module, 14, [], []));
+    fn init_monosynth(&mut self) -> ControlMap {
+        let sample_rate = self.sample_rate;
+        let note_pitch = self.create_node(modules::NotePitch::new(), [], []);
+        let saw = self.create_node(modules::Saw::new(sample_rate), [], [(note_pitch, 0)]);
+        let cutoff = self.create_node(modules::SmoothCtrl::new(880.0f32.log2()), [], []);
+        let reso = self.create_node(modules::SmoothCtrl::new(0.5), [], []);
+        let filter_out = self.create_node(modules::Biquad::new(sample_rate),
+            [(saw, 0)], [(cutoff, 0), (reso, 0)]);
+
+        let attack = self.create_node(modules::SmoothCtrl::new(5.0), [], []);
+        let decay = self.create_node(modules::SmoothCtrl::new(5.0), [], []);
+        let sustain = self.create_node(modules::SmoothCtrl::new(4.0), [], []);
+        let release = self.create_node(modules::SmoothCtrl::new(5.0), [], []);
+        let adsr = self.create_node(modules::Adsr::new(), [],
+            vec![(attack, 0), (decay, 0), (sustain, 0), (release, 0)]);
+        let env_out = self.create_node(modules::Gain::new(), [(filter_out, 0)], [(adsr, 0)]);
+
+        self.add_output(env_out);
+
+        ControlMap {
+            cutoff,
+            reso,
+            attack,
+            decay,
+            sustain,
+            release,
+            note_receivers: vec![note_pitch, adsr],
+        }
     }
 
     fn send(&self, msg: Message) {
@@ -122,11 +165,20 @@ impl Core {
     fn poll_rx(&mut self) -> usize {
         self.rx.recv().count()
     }
+
+    fn add_output(&mut self, node: usize) {
+        self.output_bus.push(node);
+
+        let module = Box::new(modules::Sum::new());
+        let buf_wiring: Vec<_> = self.output_bus.iter().map(|n| (*n, 0)).collect();
+        self.send_node(Node::create(module, 0, buf_wiring, []));
+    }
 }
 
 impl Midi {
-    fn new() -> Midi {
+    fn new(control_map: ControlMap) -> Midi {
         Midi {
+            control_map,
             cur_note: None,
         }
     }
@@ -164,14 +216,31 @@ impl Midi {
                 let controller = data[i + 1];
                 let value = data[i + 2];
                 match controller {
-                    1 => self.set_ctrl_const(core, value, 0.0, 22_000f32.log2(), 3, ts),
-                    2 => self.set_ctrl_const(core, value, 0.0, 0.995, 4, ts),
-                    3 => self.set_ctrl_const(core, value, 0.0, 22_000f32.log2(), 5, ts),
+                    1 => {
+                        let cutoff = self.control_map.cutoff;
+                        self.set_ctrl_const(core, value, 0.0, 22_000f32.log2(), cutoff, ts);
+                    }
+                    2 => {
+                        let reso = self.control_map.reso;
+                        self.set_ctrl_const(core, value, 0.0, 0.995, reso, ts);
+                    }
 
-                    5 => self.set_ctrl_const(core, value, 0.0, 10.0, 11, ts),
-                    6 => self.set_ctrl_const(core, value, 0.0, 10.0, 12, ts),
-                    7 => self.set_ctrl_const(core, value, 0.0, 6.0, 13, ts),
-                    8 => self.set_ctrl_const(core, value, 0.0, 10.0, 14, ts),
+                    5 => {
+                        let attack = self.control_map.attack;
+                        self.set_ctrl_const(core, value, 0.0, 10.0, attack, ts);
+                    }
+                    6 => {
+                        let decay = self.control_map.decay;
+                        self.set_ctrl_const(core, value, 0.0, 10.0, decay, ts);
+                    }
+                    7 => {
+                        let sustain = self.control_map.sustain;
+                        self.set_ctrl_const(core, value, 0.0, 6.0, sustain, ts);
+                    }
+                    8 => {
+                        let release = self.control_map.release;
+                        self.set_ctrl_const(core, value, 0.0, 10.0, release, ts);
+                    }
                     _ => println!("don't have handler for controller {}", controller),
                 }
                 i += 3;
@@ -180,7 +249,8 @@ impl Midi {
                 let velocity = data[i + 2];
                 let on = data[i] == 0x90 && velocity > 0;
                 if on || self.cur_note == Some(midi_num) {
-                    self.send_note(core, vec![5, 7], midi_num as f32, velocity as f32, on, ts);
+                    let targets = self.control_map.note_receivers.clone();
+                    self.send_note(core, targets, midi_num as f32, velocity as f32, on, ts);
                     self.cur_note = if on { Some(midi_num) } else { None }
                 }
                 i += 3;
