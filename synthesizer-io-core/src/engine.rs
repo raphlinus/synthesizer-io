@@ -34,6 +34,16 @@ pub struct Engine {
     midi: Option<Midi>,
 }
 
+/// Type used to identify nodes in the external interface (not to be confused
+/// with nodes in the low-level graph).
+pub type NodeId = usize;
+
+/// The type of a module to be instantiated. It's not clear this should be
+/// an enum, but it should do for now.
+pub enum ModuleType {
+    Sin,
+}
+
 /// The core owns the connection to the real-time worker.
 struct Core {
     sample_rate: f32,
@@ -104,6 +114,13 @@ impl Engine {
     pub fn poll_rx(&mut self) -> usize {
         self.core.poll_rx()
     }
+
+    /// Instantiate a module. Right now, the module has no inputs and the output
+    /// is run directly to the output bus, but we'll soon add the ability to
+    /// manipulate a wiring graph.
+    pub fn instantiate_module(&mut self, node_id: NodeId, ty: ModuleType) {
+        self.core.instantiate_module(node_id, ty);
+    }
 }
 
 impl Core {
@@ -172,6 +189,17 @@ impl Core {
         let module = Box::new(modules::Sum::new());
         let buf_wiring: Vec<_> = self.output_bus.iter().map(|n| (*n, 0)).collect();
         self.send_node(Node::create(module, 0, buf_wiring, []));
+    }
+
+    fn instantiate_module(&mut self, _node_id: NodeId, ty: ModuleType) {
+        let ll_id = match ty {
+            ModuleType::Sin => {
+                let pitch = self.create_node(modules::SmoothCtrl::new(440.0f32.log2()), [], []);
+                let sample_rate = self.sample_rate;
+                self.create_node(modules::Sin::new(sample_rate), [], [(pitch, 0)])
+            }
+        };
+        self.add_output(ll_id);
     }
 }
 

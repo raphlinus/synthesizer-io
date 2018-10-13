@@ -35,7 +35,7 @@ use midir::{MidiInput, MidiInputConnection};
 
 use synthesizer_io_core::modules;
 
-use synthesizer_io_core::engine::{Engine, NoteEvent};
+use synthesizer_io_core::engine::{Engine, ModuleType, NoteEvent};
 use synthesizer_io_core::worker::Worker;
 use synthesizer_io_core::graph::Node;
 use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
@@ -46,7 +46,7 @@ use xi_win_shell::window::WindowBuilder;
 use xi_win_ui::{UiMain, UiState};
 use xi_win_ui::widget::{Column, EventForwarder, Label};
 
-use grid::Delta;
+use grid::{Delta, WireDelta};
 use ui::{Patcher, Piano};
 
 struct SynthState {
@@ -56,10 +56,35 @@ struct SynthState {
     engine: Arc<Mutex<Engine>>,
 }
 
+#[derive(Clone)]
+enum Action {
+    Note(NoteEvent),
+    Patch(Vec<Delta>),
+}
+
 impl SynthState {
-    fn action(&mut self, note_event: &NoteEvent) {
-        let mut engine = self.engine.lock().unwrap();
-        engine.dispatch_note_event(note_event);
+    fn action(&mut self, action: &Action) {
+        match *action {
+            Action::Note(ref note_event) => {
+                let mut engine = self.engine.lock().unwrap();
+                engine.dispatch_note_event(note_event);
+            }
+            Action::Patch(ref delta) => self.apply_patch_delta(delta),
+        }
+    }
+
+    fn apply_patch_delta(&mut self, delta: &[Delta]) {
+        for d in delta {
+            match d {
+                Delta::Wire(WireDelta { grid_ix, val }) => {
+                    println!("got wire delta {:?} {}", grid_ix, val);
+                }
+                Delta::Module(_inst) => {
+                    let mut engine = self.engine.lock().unwrap();
+                    engine.instantiate_module(0, ModuleType::Sin);
+                }
+            }
+        }
     }
 }
 
@@ -86,14 +111,14 @@ fn main() {
     let patcher = Patcher::new().ui(&mut state);
     let piano = Piano::new().ui(&mut state);
     let column = Column::new().ui(&[button, patcher, piano], &mut state);
-    let forwarder = EventForwarder::<NoteEvent>::new().ui(column, &mut state);
-    state.add_listener(patcher, move |delta: &mut Vec<Delta>, _ctx| {
-        println!("delta: {:?}", delta);
+    let forwarder = EventForwarder::<Action>::new().ui(column, &mut state);
+    state.add_listener(patcher, move |delta: &mut Vec<Delta>, mut ctx| {
+        ctx.poke_up(&mut Action::Patch(delta.clone()));
     });
     state.add_listener(piano, move |event: &mut NoteEvent, mut ctx| {
-        ctx.poke_up(event);
+        ctx.poke_up(&mut Action::Note(event.clone()));
     });
-    state.add_listener(forwarder, move |action: &mut NoteEvent, _ctx| {
+    state.add_listener(forwarder, move |action: &mut Action, _ctx| {
         synth_state.action(action);
     });
     state.set_root(forwarder);

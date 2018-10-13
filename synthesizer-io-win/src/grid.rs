@@ -38,7 +38,7 @@ pub struct ModuleSpec {
     pub name: String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Delta {
     Wire(WireDelta),
     /// Add a module. Note: we need to encode moving and deleting as well, and
@@ -46,7 +46,7 @@ pub enum Delta {
     Module(ModuleInstance),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct WireDelta {
     pub grid_ix: (u16, u16, bool),
     pub val: bool,
