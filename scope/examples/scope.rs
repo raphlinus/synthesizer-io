@@ -66,13 +66,7 @@ fn main() {
     );
     */
     let mut scope = Scope::new(640, 480);
-    scope.add_dot(100.0, 100.0, 5.0, 1.0);
     let r = 1.0;
-    let dx = 100.0;
-    let dy = 10.0;
-    let amp = 40.0;
-    scope.add_line_step(100.0, 200.0, 100.0 + dx, 200.0 + dy, r, amp);
-    scope.add_line(100.0, 220.0, 100.0 + dx, 220.0 + dy, r, amp);
     let start = ::std::time::Instant::now();
     let mut xylast = None;
     // sinewave!

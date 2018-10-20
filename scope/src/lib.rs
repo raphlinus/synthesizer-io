@@ -60,7 +60,10 @@ impl Scope {
         let dx = x1 - x0;
         let dy = y1 - y0;
         let len2 = dx * dx + dy * dy;
-        // TODO: if len2 is very small, just add_dot
+        if len2 < 1.0 {
+            self.add_dot((x0 + x1) * 0.5, (y0 + y1) * 0.5, r, amp);
+            return;
+        }
         // Also, for medium-small lengths, add_line_step with 2 steps might win.
         let uvscale = 1.0 / (r * len2.sqrt());
         let vx = -dy * uvscale;
@@ -93,12 +96,58 @@ impl Scope {
         let n = self.width * self.height;
         let mut im = vec![255; n * 4];
         for i in 0..n {
-            let g = (255.0 * self.glow[i].max(0.0).min(1.0)) as u8;
-            im[i * 4 + 0] = g;
+            let r = (64.0 * self.glow[i].min(1.0).sqrt()) as u8;
+            let g = (255.0 * (self.glow[i] + 0.03).min(1.0).sqrt()) as u8;
+            let b = (224.0 * (self.glow[i] + 0.1).min(1.0).sqrt()) as u8;
+            im[i * 4 + 0] = r;
             im[i * 4 + 1] = g;
-            im[i * 4 + 2] = g;
+            im[i * 4 + 2] = b;
         }
+        self.render_grid_lines(&mut im);
         im
+    }
+
+    fn render_grid_lines(&self, im: &mut [u8]) {
+        let x2 = self.width / 2;
+        let y2 = self.height / 2;
+        let grid_sp = 60;
+        let tick_sp = 12;
+        let tick_len = 6;
+        self.render_hline(0, self.width, y2, im);
+        self.render_vline(x2, 0, self.height, im);
+        for i in 1..((y2 + grid_sp - 1) / grid_sp) {
+            self.render_hline(0, self.width, y2 + i * grid_sp, im);
+            self.render_hline(0, self.width, y2 - i * grid_sp, im);
+        }
+        for i in 1..((x2 + grid_sp - 1) / grid_sp) {
+            self.render_vline(x2 + i * grid_sp, 0, self.height, im);
+            self.render_vline(x2 - i * grid_sp, 0, self.height, im);
+        }
+        for i in 1..((y2 + tick_sp - 1) / tick_sp) {
+            self.render_hline(x2 - tick_len, x2 + tick_len, y2 - i * tick_sp, im);
+            self.render_hline(x2 - tick_len, x2 + tick_len, y2 + i * tick_sp, im);
+        }
+        for i in 1..((x2 + tick_sp - 1) / tick_sp) {
+            self.render_vline(x2 + i * tick_sp, y2 - tick_len, y2 + tick_len, im);
+            self.render_vline(x2 - i * tick_sp, y2 - tick_len, y2 + tick_len, im);
+        }
+    }
+
+    fn render_hline(&self, x0: usize, x1: usize, y: usize, im: &mut [u8]) {
+        for i in (y * self.width + x0)..(y * self.width + x1) {
+            im[i * 4 + 0] >>= 1;
+            im[i * 4 + 1] >>= 1;
+            im[i * 4 + 2] >>= 1;
+        }
+    }
+
+    fn render_vline(&self, x: usize, y0: usize, y1: usize, im: &mut [u8]) {
+        for j in y0..y1 {
+            let i = j * self.width + x;
+            im[i * 4 + 0] >>= 1;
+            im[i * 4 + 1] >>= 1;
+            im[i * 4 + 2] >>= 1;
+        }
     }
 }
 
