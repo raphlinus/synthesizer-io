@@ -20,8 +20,11 @@ extern crate direct2d;
 extern crate xi_win_ui;
 extern crate xi_win_shell;
 extern crate synthesizer_io_core;
+extern crate synthesize_scope;
 extern crate time;
 extern crate itertools;
+extern crate winapi;
+extern crate dxgi;
 
 mod grid;
 mod ui;
@@ -47,7 +50,7 @@ use xi_win_ui::{UiMain, UiState};
 use xi_win_ui::widget::{Column, EventForwarder, Label};
 
 use grid::{Delta, WireDelta};
-use ui::{Patcher, Piano};
+use ui::{Patcher, Piano, Scope};
 
 struct SynthState {
     // We probably want to move to the synth state fully owning the engine, and
@@ -110,10 +113,12 @@ fn main() {
     let button = Label::new("Synthesizer IO").ui(&mut state);
     let patcher = Patcher::new().ui(&mut state);
     let piano = Piano::new().ui(&mut state);
+    let scope = Scope::new().ui(&mut state);
     let mut column = Column::new();
     column.set_flex(patcher, 3.0);
     column.set_flex(piano, 1.0);
-    let column = column.ui(&[button, patcher, piano], &mut state);
+    column.set_flex(scope, 1.0);
+    let column = column.ui(&[button, patcher, scope, piano], &mut state);
     let forwarder = EventForwarder::<Action>::new().ui(column, &mut state);
     state.add_listener(patcher, move |delta: &mut Vec<Delta>, mut ctx| {
         ctx.poke_up(&mut Action::Patch(delta.clone()));

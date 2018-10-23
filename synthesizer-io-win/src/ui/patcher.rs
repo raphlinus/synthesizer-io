@@ -23,8 +23,8 @@ use direct2d::stroke_style::{StrokeStyle, StrokeStyleBuilder};
 
 use xi_win_ui::{BoxConstraints, Geometry, LayoutResult, UiInner};
 use xi_win_ui::{Id, HandlerCtx, LayoutCtx, PaintCtx};
-use xi_win_ui::MouseEvent;
-use xi_win_ui::widget::{MouseButton, Widget};
+use xi_win_ui::{MouseEvent, Widget};
+use xi_win_ui::widget::MouseButton;
 
 use grid::{Delta, ModuleGrid, ModuleInstance, ModuleSpec, WireDelta, WireGrid};
 

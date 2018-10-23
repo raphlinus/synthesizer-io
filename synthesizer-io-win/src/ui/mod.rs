@@ -14,8 +14,10 @@
 
 //! UI components and logic for the synthesizer.
 
-mod piano;
 mod patcher;
+mod piano;
+mod scope;
 
-pub use self::piano::Piano;
 pub use self::patcher::Patcher;
+pub use self::piano::Piano;
+pub use self::scope::Scope;

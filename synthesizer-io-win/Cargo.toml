@@ -14,5 +14,13 @@ direct2d = "0.2.0"
 xi-win-ui = { git = "https://github.com/xi-editor/xi-win" }
 xi-win-shell = { git = "https://github.com/xi-editor/xi-win" }
 
+# The following two are only for datatypes consumed by direct2d; should
+# ultimately disappear
+winapi = "0.3.6"
+dxgi = "0.1.7"
+
 [dependencies.synthesizer-io-core]
 path = "../synthesizer-io-core"
+
+[dependencies.synthesize-scope]
+path = "../scope"

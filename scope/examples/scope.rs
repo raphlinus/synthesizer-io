@@ -81,5 +81,6 @@ fn main() {
     }
     println!("elapsed: {:?}", start.elapsed());
     let img = scope.as_rgba();
+    println!("elapsed after rgba: {:?}", start.elapsed());
     writer.write_image_data(&img).unwrap();
 }

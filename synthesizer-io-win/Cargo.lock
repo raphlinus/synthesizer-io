@@ -524,6 +524,10 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "synthesize-scope"
+version = "0.1.0"
+
+[[package]]
 name = "synthesizer-io-core"
 version = "0.1.0"
 dependencies = [
@@ -537,10 +541,13 @@ version = "0.1.0"
 dependencies = [
  "cpal 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dxgi 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "midir 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "synthesize-scope 0.1.0",
  "synthesizer-io-core 0.1.0",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "xi-win-shell 0.1.0 (git+https://github.com/xi-editor/xi-win)",
  "xi-win-ui 0.1.0 (git+https://github.com/xi-editor/xi-win)",
 ]
