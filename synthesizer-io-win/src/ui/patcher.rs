@@ -96,13 +96,15 @@ impl Widget for Patcher {
 
     fn mouse(&mut self, event: &MouseEvent, ctx: &mut HandlerCtx) -> bool {
         // Middle mouse button cycles through modes
-        if event.which == MouseButton::Middle && event.count > 0 {
-            let new_mode = match self.mode {
-                PatcherMode::Wire => PatcherMode::Module,
-                PatcherMode::Module => PatcherMode::Wire,
-            };
-            self.mode = new_mode;
-            self.update_hover(None, ctx);
+        if event.which == MouseButton::Middle {
+            if event.count > 0 {
+                let new_mode = match self.mode {
+                    PatcherMode::Wire => PatcherMode::Module,
+                    PatcherMode::Module => PatcherMode::Wire,
+                };
+                self.mode = new_mode;
+                self.update_hover(None, ctx);
+            }
             return true;
         }
         match self.mode {

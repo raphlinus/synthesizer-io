@@ -110,7 +110,10 @@ fn main() {
     let button = Label::new("Synthesizer IO").ui(&mut state);
     let patcher = Patcher::new().ui(&mut state);
     let piano = Piano::new().ui(&mut state);
-    let column = Column::new().ui(&[button, patcher, piano], &mut state);
+    let mut column = Column::new();
+    column.set_flex(patcher, 3.0);
+    column.set_flex(piano, 1.0);
+    let column = column.ui(&[button, patcher, piano], &mut state);
     let forwarder = EventForwarder::<Action>::new().ui(column, &mut state);
     state.add_listener(patcher, move |delta: &mut Vec<Delta>, mut ctx| {
         ctx.poke_up(&mut Action::Patch(delta.clone()));
