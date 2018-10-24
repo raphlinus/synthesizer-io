@@ -14,16 +14,17 @@
 
 //! Widget for oscilloscope display.
 
+use std::any::Any;
+
 use direct2d::enums::BitmapInterpolationMode;
 use direct2d::image::Bitmap;
 use direct2d::math::SizeU;
 use direct2d::RenderTarget;
-
 use dxgi::Format;
 use winapi::um::dcommon::D2D_SIZE_U;
 use winapi::shared::basetsd::UINT32;
 
-use xi_win_ui::{BoxConstraints, LayoutCtx, LayoutResult};
+use xi_win_ui::{BoxConstraints, HandlerCtx, LayoutCtx, LayoutResult};
 use xi_win_ui::{Id, Geometry, PaintCtx, UiInner, Widget};
 
 use synthesize_scope as s;
@@ -32,6 +33,11 @@ pub struct Scope {
     // I might want to call the data structure ScopeBuf or some such,
     // too many name collisions :/
     s: s::Scope,
+}
+
+#[derive(Clone, Debug)]
+pub enum ScopeCommand {
+    Start,
 }
 
 impl Widget for Scope {
@@ -69,6 +75,24 @@ impl Widget for Scope {
         //self.size = size;
         LayoutResult::Size(size)
     }
+
+    fn poke(&mut self, payload: &mut Any, ctx: &mut HandlerCtx) -> bool {
+        if let Some(cmd) = payload.downcast_ref::<ScopeCommand>() {
+            match cmd {
+                ScopeCommand::Start => ctx.request_anim_frame(),
+            }
+            true
+        } else {
+            println!("downcast failed in scope");
+            false
+        }
+    }
+
+    fn anim_frame(&mut self, _interval: u64, ctx: &mut HandlerCtx) {
+        // TODO: use interval to fade the scope.
+        ctx.send_event(());
+        ctx.request_anim_frame();
+    }
 }
 
 impl Scope {
@@ -79,8 +103,10 @@ impl Scope {
         result
     }
 
-    pub fn ui(self, ctx: &mut UiInner) -> Id {
-        ctx.add(self, &[])
+    pub fn ui(self, ui: &mut UiInner) -> Id {
+        let id = ui.add(self, &[]);
+        ui.poke(id, &mut ScopeCommand::Start);
+        id
     }
 
     fn draw_test_pattern(&mut self) {

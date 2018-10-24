@@ -29,9 +29,10 @@ extern crate dxgi;
 mod grid;
 mod ui;
 
+use std::any::Any;
 use std::ops::DerefMut;
-use std::thread;
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 use cpal::{EventLoop, StreamData, UnknownTypeOutputBuffer};
 use midir::{MidiInput, MidiInputConnection};
@@ -46,12 +47,14 @@ use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
 use xi_win_shell::win_main;
 use xi_win_shell::window::WindowBuilder;
 
-use xi_win_ui::{UiMain, UiState};
-use xi_win_ui::widget::{Column, EventForwarder, Label};
+use xi_win_ui::{HandlerCtx, Id, UiInner, UiMain, UiState, Widget};
+use xi_win_ui::widget::{Column, Label};
 
 use grid::{Delta, WireDelta};
 use ui::{Patcher, Piano, Scope};
 
+/// Synthesizer engine state. This is placed in the UI as a widget so that
+/// listeners can synchronously access its state.
 struct SynthState {
     // We probably want to move to the synth state fully owning the engine, and
     // things like midi being routed through the synth state. But for now this
@@ -63,16 +66,36 @@ struct SynthState {
 enum Action {
     Note(NoteEvent),
     Patch(Vec<Delta>),
+    Poll(usize),
+}
+
+impl Widget for SynthState {
+    fn poke(&mut self, payload: &mut Any, _ctx: &mut HandlerCtx) -> bool {
+        if let Some(action) = payload.downcast_mut::<Action>() {
+            self.action(action);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl SynthState {
-    fn action(&mut self, action: &Action) {
+    pub fn ui(self, child: Id, ctx: &mut UiInner) -> Id {
+        ctx.add(self, &[child])
+    }
+
+    fn action(&mut self, action: &mut Action) {
         match *action {
             Action::Note(ref note_event) => {
                 let mut engine = self.engine.lock().unwrap();
                 engine.dispatch_note_event(note_event);
             }
             Action::Patch(ref delta) => self.apply_patch_delta(delta),
+            Action::Poll(ref mut n_msg) => {
+                let mut engine = self.engine.lock().unwrap();
+                *n_msg = engine.poll_rx();
+            }
         }
     }
 
@@ -91,6 +114,34 @@ impl SynthState {
     }
 }
 
+/// Build the main window UI
+fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
+    let button = Label::new("Synthesizer IO").ui(ui);
+    let patcher = Patcher::new().ui(ui);
+    let scope = Scope::new().ui(ui);
+    let piano = Piano::new().ui(ui);
+    let mut column = Column::new();
+    column.set_flex(patcher, 3.0);
+    column.set_flex(scope, 1.0);
+    column.set_flex(piano, 1.0);
+    let column = column.ui(&[button, patcher, scope, piano], ui);
+    let synth_state = synth_state.ui(column, ui);
+    ui.add_listener(patcher, move |delta: &mut Vec<Delta>, mut ctx| {
+        ctx.poke_up(&mut Action::Patch(delta.clone()));
+    });
+    ui.add_listener(scope, move |_event: &mut (), mut ctx| {
+        let mut action = Action::Poll(0);
+        ctx.poke_up(&mut action);
+        if let Action::Poll(n_msg) = action {
+            println!("polled {} events", n_msg);
+        }
+    });
+    ui.add_listener(piano, move |event: &mut NoteEvent, mut ctx| {
+        ctx.poke_up(&mut Action::Note(event.clone()));
+    });
+    synth_state
+}
+
 fn main() {
     xi_win_shell::init();
     let (mut worker, tx, rx) = Worker::create(1024);
@@ -100,7 +151,7 @@ fn main() {
 
     let engine = Arc::new(Mutex::new(engine));
 
-    let mut synth_state = SynthState { engine: engine.clone() };
+    let synth_state = SynthState { engine: engine.clone() };
 
     // Set up working graph; will probably be replaced by the engine before
     // the first audio callback runs.
@@ -110,26 +161,8 @@ fn main() {
     let mut run_loop = win_main::RunLoop::new();
     let mut builder = WindowBuilder::new();
     let mut state = UiState::new();
-    let button = Label::new("Synthesizer IO").ui(&mut state);
-    let patcher = Patcher::new().ui(&mut state);
-    let piano = Piano::new().ui(&mut state);
-    let scope = Scope::new().ui(&mut state);
-    let mut column = Column::new();
-    column.set_flex(patcher, 3.0);
-    column.set_flex(piano, 1.0);
-    column.set_flex(scope, 1.0);
-    let column = column.ui(&[button, patcher, scope, piano], &mut state);
-    let forwarder = EventForwarder::<Action>::new().ui(column, &mut state);
-    state.add_listener(patcher, move |delta: &mut Vec<Delta>, mut ctx| {
-        ctx.poke_up(&mut Action::Patch(delta.clone()));
-    });
-    state.add_listener(piano, move |event: &mut NoteEvent, mut ctx| {
-        ctx.poke_up(&mut Action::Note(event.clone()));
-    });
-    state.add_listener(forwarder, move |action: &mut Action, _ctx| {
-        synth_state.action(action);
-    });
-    state.set_root(forwarder);
+    let root = build_ui(synth_state, &mut state);
+    state.set_root(root);
     builder.set_handler(Box::new(UiMain::new(state)));
     builder.set_title("Synthesizer IO");
     let window = builder.build().unwrap();
