@@ -95,6 +95,8 @@ impl SynthState {
             Action::Poll(ref mut n_msg) => {
                 let mut engine = self.engine.lock().unwrap();
                 *n_msg = engine.poll_rx();
+                let data = engine.poll_monitor();
+                println!("polled {} samples, first is {:?}", data.len(), data.get(0));
             }
         }
     }
@@ -133,7 +135,7 @@ fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
         let mut action = Action::Poll(0);
         ctx.poke_up(&mut action);
         if let Action::Poll(n_msg) = action {
-            println!("polled {} events", n_msg);
+            //println!("polled {} events", n_msg);
         }
     });
     ui.add_listener(piano, move |event: &mut NoteEvent, mut ctx| {

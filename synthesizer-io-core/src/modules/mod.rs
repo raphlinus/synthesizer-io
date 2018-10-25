@@ -24,6 +24,7 @@ mod smooth_ctrl;
 mod note_pitch;
 mod adsr;
 mod gain;
+mod monitor;
 
 pub use self::sum::Sum;
 pub use self::buzz::Buzz;
@@ -35,3 +36,4 @@ pub use self::smooth_ctrl::SmoothCtrl;
 pub use self::note_pitch::NotePitch;
 pub use self::adsr::Adsr;
 pub use self::gain::Gain;
+pub use self::monitor::Monitor;

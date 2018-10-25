@@ -54,6 +54,8 @@ struct Core {
 
     // List of nodes that generate output. Maybe should be node, channel pairs.
     output_bus: Vec<usize>,
+
+    monitor_queues: Option<MonitorQueues>,
 }
 
 #[derive(Clone)]
@@ -78,6 +80,11 @@ struct ControlMap {
     release: usize,
 
     note_receivers: Vec<usize>,
+}
+
+struct MonitorQueues {
+    rx: Receiver<Vec<f32>>,
+    tx: Sender<Vec<f32>>,
 }
 
 impl Engine {
@@ -110,9 +117,14 @@ impl Engine {
     }
 
     /// Poll the return queue. Right now this just returns the number of items
-    /// retrieved, but the interface will change to include monitoring.
+    /// retrieved.
     pub fn poll_rx(&mut self) -> usize {
         self.core.poll_rx()
+    }
+
+    /// Poll the monitor queue, retrieving audio data.
+    pub fn poll_monitor(&mut self) -> Vec<f32> {
+        self.core.poll_monitor()
     }
 
     /// Instantiate a module. Right now, the module has no inputs and the output
@@ -128,7 +140,8 @@ impl Core {
         let mut id_alloc = IdAllocator::new();
         id_alloc.reserve(0);
         let output_bus = Vec::new();
-        Core { sample_rate, rx, tx, id_alloc, output_bus }
+        let monitor_queues = None;
+        Core { sample_rate, rx, tx, id_alloc, output_bus, monitor_queues }
     }
 
     pub fn create_node<B1: IntoBoxedSlice<(usize, usize)>,
@@ -158,7 +171,11 @@ impl Core {
             vec![(attack, 0), (decay, 0), (sustain, 0), (release, 0)]);
         let env_out = self.create_node(modules::Gain::new(), [(filter_out, 0)], [(adsr, 0)]);
 
-        self.add_output(env_out);
+        let (monitor, tx, rx) = modules::Monitor::new();
+        self.monitor_queues = Some(MonitorQueues { tx, rx });
+        let monitor = self.create_node(monitor, [(env_out, 0)], []);
+
+        self.add_output(monitor);
 
         ControlMap {
             cutoff,
@@ -181,6 +198,18 @@ impl Core {
 
     fn poll_rx(&mut self) -> usize {
         self.rx.recv().count()
+    }
+
+    fn poll_monitor(&self) -> Vec<f32> {
+        let mut result = Vec::new();
+        if let Some(ref qs) = self.monitor_queues {
+            for mut item in qs.rx.recv_items() {
+                result.extend_from_slice(&item);
+                item.clear();
+                qs.tx.send_item(item);
+            }
+        }
+        result
     }
 
     fn add_output(&mut self, node: usize) {

@@ -51,9 +51,19 @@ enum VisitedState {
 use self::VisitedState::*;
 
 pub enum Message {
+    /// A node. It replaces the existing node at that id, calling `migrate`
+    /// on the new module.
     Node(Node),
+
+    /// A parameter change request.
     SetParam(SetParam),
+
+    /// An abstraction of a MIDI note. This message may be going away,
+    /// it's more in line with analog synthesizer emulation to represent
+    /// it as three separate control lines (gate, pitch, velocity).
     Note(Note),
+
+    /// A request to shut down in an orderly way. Currently does nothing.
     Quit,
 }
 
