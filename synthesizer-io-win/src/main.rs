@@ -122,8 +122,8 @@ fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
     let scope = Scope::new().ui(ui);
     let piano = Piano::new().ui(ui);
     let mut column = Column::new();
-    column.set_flex(patcher, 3.0);
-    column.set_flex(scope, 1.0);
+    column.set_flex(patcher, 2.0);
+    column.set_flex(scope, 2.0);
     column.set_flex(piano, 1.0);
     let column = column.ui(&[button, patcher, scope, piano], ui);
     let synth_state = synth_state.ui(column, ui);

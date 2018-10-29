@@ -35,18 +35,26 @@ pub struct Scope {
     gain: f32,
 
     xylast: Option<(f32, f32)>,
+
+    state: ScopeState,
+}
+
+enum ScopeState {
+    WaitingForTrigger(f32),
+    Scanning,
 }
 
 impl Scope {
     // Create a new Scope instance of the given size.
     pub fn new(width: usize, height: usize) -> Scope {
         let glow = vec![0.0; width * height];
-        let tc = 1_000.0;
+        let tc = 1_500.0;
         let sweep = 0.001;
         let horiz = 0.0;
         let gain = 1.0;
         let xylast = None;
-        Scope { width, height, glow, tc, sweep, horiz, gain, xylast }
+        let state = ScopeState::WaitingForTrigger(-1.0);
+        Scope { width, height, glow, tc, sweep, horiz, gain, xylast, state }
     }
 
     // Add a dot to the glow.
@@ -116,8 +124,8 @@ impl Scope {
         let mut im = vec![255; n * 4];
         for i in 0..n {
             let r = (64.0 * self.glow[i].min(1.0).sqrt()) as u8;
-            let g = (255.0 * (self.glow[i] + 0.03).min(1.0).sqrt()) as u8;
-            let b = (224.0 * (self.glow[i] + 0.1).min(1.0).sqrt()) as u8;
+            let g = (255.0 * (self.glow[i] + 0.05).min(1.0).sqrt()) as u8;
+            let b = (224.0 * (self.glow[i] + 0.13).min(1.0).sqrt()) as u8;
             im[i * 4 + 0] = r;
             im[i * 4 + 1] = g;
             im[i * 4 + 2] = b;
@@ -135,19 +143,38 @@ impl Scope {
     pub fn provide_samples(&mut self, samples: &[f32]) {
         let factor = (-(samples.len() as f32) / self.tc).exp();
         self.fade(factor);
+        let mut amp = 2.0 * factor;
+        let ampgain = (1.0 / self.tc).exp();
         let y0 = self.height as f32 * 0.5;
         let yscale = y0 * self.gain;
         for sample in samples {
-            let x = self.horiz * (self.width as f32);
-            let y = y0 - yscale * sample;
-            if let Some((xlast, ylast)) = self.xylast {
-                self.add_line(xlast, ylast, x, y, 1.0, 2.0);
-            }
-            self.xylast = Some((x, y));
-            self.horiz += self.sweep;
-            if self.horiz > 1.0 {
-                self.horiz -= 1.0;
-                self.xylast = None;
+            match self.state {
+                ScopeState::Scanning => {
+                    let x = self.horiz * (self.width as f32);
+                    let y = y0 - yscale * sample;
+                    if let Some((xlast, ylast)) = self.xylast {
+                        self.add_line(xlast, ylast, x, y, 1.0, amp);
+                        amp *= ampgain;
+                    }
+                    self.xylast = Some((x, y));
+                    self.horiz += self.sweep;
+                    if self.horiz > 1.0 {
+                        self.xylast = None;
+                        self.state = ScopeState::WaitingForTrigger(*sample);
+                    }
+                }
+                ScopeState::WaitingForTrigger(old) => {
+                    let trigger_level = 0.0;
+                    if old < trigger_level && *sample > trigger_level {
+                        self.horiz = 0.0; // TODO: linear interp
+                        let x = self.horiz * (self.width as f32);
+                        let y = y0 - yscale * sample;
+                        self.xylast = Some((x, y));
+                        self.state = ScopeState::Scanning;
+                    } else {
+                        self.state = ScopeState::WaitingForTrigger(*sample);
+                    }
+                }
             }
         }
     }

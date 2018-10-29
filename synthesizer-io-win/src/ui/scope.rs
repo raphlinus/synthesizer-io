@@ -99,9 +99,7 @@ impl Widget for Scope {
 impl Scope {
     pub fn new() -> Scope {
         let s = s::Scope::new(640, 480);
-        let mut result = Scope { s };
-        result.draw_test_pattern();
-        result
+        Scope { s }
     }
 
     pub fn ui(self, ui: &mut UiInner) -> Id {
