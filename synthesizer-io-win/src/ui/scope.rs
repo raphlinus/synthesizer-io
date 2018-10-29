@@ -38,6 +38,7 @@ pub struct Scope {
 #[derive(Clone, Debug)]
 pub enum ScopeCommand {
     Start,
+    Samples(Vec<f32>),
 }
 
 impl Widget for Scope {
@@ -80,6 +81,7 @@ impl Widget for Scope {
         if let Some(cmd) = payload.downcast_ref::<ScopeCommand>() {
             match cmd {
                 ScopeCommand::Start => ctx.request_anim_frame(),
+                ScopeCommand::Samples(samples) => self.s.provide_samples(&samples),
             }
             true
         } else {
@@ -89,7 +91,6 @@ impl Widget for Scope {
     }
 
     fn anim_frame(&mut self, _interval: u64, ctx: &mut HandlerCtx) {
-        // TODO: use interval to fade the scope.
         ctx.send_event(());
         ctx.request_anim_frame();
     }

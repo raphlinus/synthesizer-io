@@ -51,7 +51,7 @@ use xi_win_ui::{HandlerCtx, Id, UiInner, UiMain, UiState, Widget};
 use xi_win_ui::widget::{Column, Label};
 
 use grid::{Delta, WireDelta};
-use ui::{Patcher, Piano, Scope};
+use ui::{Patcher, Piano, Scope, ScopeCommand};
 
 /// Synthesizer engine state. This is placed in the UI as a widget so that
 /// listeners can synchronously access its state.
@@ -66,7 +66,7 @@ struct SynthState {
 enum Action {
     Note(NoteEvent),
     Patch(Vec<Delta>),
-    Poll(usize),
+    Poll(Vec<f32>),
 }
 
 impl Widget for SynthState {
@@ -92,11 +92,10 @@ impl SynthState {
                 engine.dispatch_note_event(note_event);
             }
             Action::Patch(ref delta) => self.apply_patch_delta(delta),
-            Action::Poll(ref mut n_msg) => {
+            Action::Poll(ref mut samples) => {
                 let mut engine = self.engine.lock().unwrap();
-                *n_msg = engine.poll_rx();
-                let data = engine.poll_monitor();
-                println!("polled {} samples, first is {:?}", data.len(), data.get(0));
+                let _n_msg = engine.poll_rx();
+                *samples = engine.poll_monitor();
             }
         }
     }
@@ -132,10 +131,11 @@ fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
         ctx.poke_up(&mut Action::Patch(delta.clone()));
     });
     ui.add_listener(scope, move |_event: &mut (), mut ctx| {
-        let mut action = Action::Poll(0);
+        let mut action = Action::Poll(Default::default());
         ctx.poke_up(&mut action);
-        if let Action::Poll(n_msg) = action {
-            //println!("polled {} events", n_msg);
+        if let Action::Poll(samples) = action {
+            ctx.poke(scope, &mut ScopeCommand::Samples(samples));
+            //println!("polled {} events", _n_msg);
         }
     });
     ui.add_listener(piano, move |event: &mut NoteEvent, mut ctx| {

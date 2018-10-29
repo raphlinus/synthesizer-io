@@ -21,13 +21,32 @@ pub struct Scope {
     width: usize,
     height: usize,
     glow: Vec<f32>,
+
+    // time constant for fade, in _samples_
+    tc: f32,
+
+    // fraction of scope width per sample
+    sweep: f32,
+
+    // current horiz position, as fraction of total width
+    horiz: f32,
+
+    // gain, where 1.0 is top to bottom of height
+    gain: f32,
+
+    xylast: Option<(f32, f32)>,
 }
 
 impl Scope {
     // Create a new Scope instance of the given size.
     pub fn new(width: usize, height: usize) -> Scope {
         let glow = vec![0.0; width * height];
-        Scope { width, height, glow }
+        let tc = 1_000.0;
+        let sweep = 0.001;
+        let horiz = 0.0;
+        let gain = 1.0;
+        let xylast = None;
+        Scope { width, height, glow, tc, sweep, horiz, gain, xylast }
     }
 
     // Add a dot to the glow.
@@ -105,6 +124,32 @@ impl Scope {
         }
         self.render_grid_lines(&mut im);
         im
+    }
+
+    pub fn fade(&mut self, factor: f32) {
+        for x in &mut self.glow {
+            *x *= factor;
+        }
+    }
+
+    pub fn provide_samples(&mut self, samples: &[f32]) {
+        let factor = (-(samples.len() as f32) / self.tc).exp();
+        self.fade(factor);
+        let y0 = self.height as f32 * 0.5;
+        let yscale = y0 * self.gain;
+        for sample in samples {
+            let x = self.horiz * (self.width as f32);
+            let y = y0 - yscale * sample;
+            if let Some((xlast, ylast)) = self.xylast {
+                self.add_line(xlast, ylast, x, y, 1.0, 2.0);
+            }
+            self.xylast = Some((x, y));
+            self.horiz += self.sweep;
+            if self.horiz > 1.0 {
+                self.horiz -= 1.0;
+                self.xylast = None;
+            }
+        }
     }
 
     fn render_grid_lines(&self, im: &mut [u8]) {
