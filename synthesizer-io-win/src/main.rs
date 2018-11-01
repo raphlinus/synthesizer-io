@@ -17,6 +17,7 @@
 extern crate cpal;
 extern crate midir;
 extern crate direct2d;
+extern crate directwrite;
 extern crate xi_win_ui;
 extern crate xi_win_shell;
 extern crate synthesizer_io_core;
@@ -48,10 +49,10 @@ use xi_win_shell::win_main;
 use xi_win_shell::window::WindowBuilder;
 
 use xi_win_ui::{HandlerCtx, Id, UiInner, UiMain, UiState, Widget};
-use xi_win_ui::widget::{Column, Label};
+use xi_win_ui::widget::{Button, Column, Label, Padding, Row};
 
 use grid::{Delta, WireDelta};
-use ui::{Patcher, Piano, Scope, ScopeCommand};
+use ui::{Patcher, PatcherAction, Piano, Scope, ScopeCommand};
 
 /// Synthesizer engine state. This is placed in the UI as a widget so that
 /// listeners can synchronously access its state.
@@ -115,17 +116,43 @@ impl SynthState {
     }
 }
 
+fn padded_flex_row(children: &[Id], ui: &mut UiState) -> Id {
+    let vec = children.iter().map(|&child|
+        Padding::uniform(5.0).ui(child, ui)).collect::<Vec<_>>();
+    let mut row = Row::new();
+    for &child in &vec {
+        row.set_flex(child, 1.0);
+    }
+    row.ui(&vec, ui)
+}
+
 /// Build the main window UI
 fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
     let button = Label::new("Synthesizer IO").ui(ui);
     let patcher = Patcher::new().ui(ui);
     let scope = Scope::new().ui(ui);
     let piano = Piano::new().ui(ui);
+
+    let modules = &["sine", "control", "saw", "biquad", "adsr", "gain"];
+
+    let wire_b = Button::new("wire").ui(ui);
+    ui.add_listener(wire_b, move |_: &mut bool, mut ctx| {
+        ctx.poke(patcher, &mut PatcherAction::WireMode);
+    });
+    let mut buttons = vec![wire_b];
+    for &module in modules {
+        let button = Button::new(module).ui(ui);
+        ui.add_listener(button, move |_: &mut bool, mut ctx| {
+            ctx.poke(patcher, &mut PatcherAction::Module(module.into()));
+        });        
+        buttons.push(button);
+    }
+    let button_row = padded_flex_row(&buttons, ui);
     let mut column = Column::new();
     column.set_flex(patcher, 2.0);
     column.set_flex(scope, 2.0);
     column.set_flex(piano, 1.0);
-    let column = column.ui(&[button, patcher, scope, piano], ui);
+    let column = column.ui(&[button, patcher, button_row, scope, piano], ui);
     let synth_state = synth_state.ui(column, ui);
     ui.add_listener(patcher, move |delta: &mut Vec<Delta>, mut ctx| {
         ctx.poke_up(&mut Action::Patch(delta.clone()));

@@ -14,12 +14,18 @@
 
 //! Widget representing patcher surface.
 
+use std::any::Any;
+use std::collections::HashMap;
+
 use itertools::Itertools;
 
 use direct2d::RenderTarget;
 use direct2d::brush::SolidColorBrush;
 use direct2d::enums::{AntialiasMode, CapStyle};
 use direct2d::stroke_style::{StrokeStyle, StrokeStyleBuilder};
+use directwrite::{self, TextFormat, TextLayout};
+
+use xi_win_shell::util::default_text_options;
 
 use xi_win_ui::{BoxConstraints, Geometry, LayoutResult, UiInner};
 use xi_win_ui::{Id, HandlerCtx, LayoutCtx, PaintCtx};
@@ -36,12 +42,21 @@ pub struct Patcher {
 
     mode: PatcherMode,
 
+    // These next are per-mode state, might want to move into mode enum.
+
     grid: WireGrid,
     last_xy: Option<(f32, f32)>,
     draw_mode: Option<bool>,
 
     modules: ModuleGrid,
     mod_hover: Option<ModuleInstance>,
+    mod_name: String,
+}
+
+#[derive(Debug)]
+pub enum PatcherAction {
+    WireMode,
+    Module(String),
 }
 
 enum PatcherMode {
@@ -52,10 +67,12 @@ enum PatcherMode {
 struct PaintResources {
     grid_color: SolidColorBrush,
     wire_color: SolidColorBrush,
+    text_color: SolidColorBrush,
     hover_ok: SolidColorBrush,
     hover_bad: SolidColorBrush,
     module_color: SolidColorBrush,
     rounded: StrokeStyle,
+    text: HashMap<String, TextLayout>,
 }
 
 impl PaintResources {
@@ -69,17 +86,38 @@ impl PaintResources {
         let rt = paint_ctx.render_target();
         let grid_color = SolidColorBrush::create(rt).with_color(0x405070).build().unwrap();
         let wire_color = SolidColorBrush::create(rt).with_color(0x808080).build().unwrap();
+        let text_color = SolidColorBrush::create(rt).with_color(0x303030).build().unwrap();
         let hover_ok = SolidColorBrush::create(rt).with_color((0x00c000, 0.5)).build().unwrap();
         let hover_bad = SolidColorBrush::create(rt).with_color((0xc00000, 0.5)).build().unwrap();
         let module_color = SolidColorBrush::create(rt).with_color(0xc0c0c0).build().unwrap();
-        PaintResources { grid_color, wire_color, hover_ok, hover_bad, module_color, rounded }
+        PaintResources { grid_color, wire_color, text_color, hover_ok, hover_bad, module_color,
+            rounded,
+            text: Default::default() }
+    }
+
+    fn add_text(&mut self, text: &str, dwrite_factory: &directwrite::Factory) {
+        if !self.text.contains_key(text) {
+                let format = TextFormat::create(dwrite_factory)
+                .with_family("Segoe UI")
+                .with_size(11.0)
+                .build()
+                .unwrap();
+            let layout = TextLayout::create(dwrite_factory)
+                .with_text(text)
+                .with_font(&format)
+                .with_width(1e6)
+                .with_height(1e6)
+                .build().unwrap();
+            self.text.insert(text.to_string(), layout);
+        }
     }
 }
 
 impl Widget for Patcher {
     fn paint(&mut self, paint_ctx: &mut PaintCtx, geom: &Geometry) {
         // TODO: retain these resources where possible
-        let resources = PaintResources::create(paint_ctx);
+        let mut resources = PaintResources::create(paint_ctx);
+        self.populate_text(&mut resources, paint_ctx.dwrite_factory());
         let rt = paint_ctx.render_target();
         self.paint_wiregrid(rt, &resources, geom);
         self.paint_modules(rt, &resources, geom);
@@ -165,10 +203,7 @@ impl Widget for Patcher {
                 let spec = if let Some(ref h) = self.mod_hover {
                     h.spec.clone()
                 } else {
-                    ModuleSpec {
-                        size: (2, 2),
-                        name: "555".into(),
-                    }
+                    make_mod_spec(&self.mod_name)
                 };
                 let xc = x - 0.5 * self.scale * (spec.size.0 as f32 - 1.0);
                 let yc = y - 0.5 * self.scale * (spec.size.1 as f32 - 1.0);
@@ -185,6 +220,24 @@ impl Widget for Patcher {
             self.update_hover(None, ctx);
         }
     }
+
+    fn poke(&mut self, payload: &mut Any, ctx: &mut HandlerCtx) -> bool {
+        if let Some(action) = payload.downcast_ref::<PatcherAction>() {
+            match action {
+                PatcherAction::WireMode => self.mode = PatcherMode::Wire,
+                PatcherAction::Module(name) => {
+                    self.mode = PatcherMode::Module;
+                    self.mod_name = name.clone();
+                }
+            }
+            self.update_hover(None, ctx);
+            ctx.invalidate();
+            true
+        } else {
+            println!("downcast failed");
+            false
+        }
+    }
 }
 
 impl Patcher {
@@ -195,7 +248,7 @@ impl Patcher {
             offset: (5.0, 5.0),
             scale: 20.0,
 
-            mode: PatcherMode::Module,
+            mode: PatcherMode::Wire,
 
             grid: Default::default(),
             last_xy: None,
@@ -203,6 +256,7 @@ impl Patcher {
 
             modules: Default::default(),
             mod_hover: None,
+            mod_name: Default::default(),
         }
     }
 
@@ -265,23 +319,38 @@ impl Patcher {
     fn paint_module<RT>(&self, rt: &mut RT, resources: &PaintResources, geom: &Geometry,
         inst: &ModuleInstance) where RT: RenderTarget
     {
-        let x0 = geom.pos.0 + self.offset.0;
-        let y0 = geom.pos.1 + self.offset.1;
+        let x0 = geom.pos.0 + self.offset.0 + (inst.loc.0 as f32) * self.scale;
+        let y0 = geom.pos.1 + self.offset.1 + (inst.loc.1 as f32) * self.scale;
         let inset = 0.1;
-        rt.fill_rectangle((x0 + (inst.loc.0 as f32 + inset) * self.scale,
-                y0 + (inst.loc.1 as f32 + inset) * self.scale,
-                x0 + ((inst.loc.0 + inst.spec.size.0) as f32 - inset) * self.scale,
-                y0 + ((inst.loc.1 + inst.spec.size.1) as f32 - inset) * self.scale),
+        rt.fill_rectangle((x0 + inset * self.scale,
+                y0 + inset * self.scale,
+                x0 + (inst.spec.size.0 as f32 - inset) * self.scale,
+                y0 + (inst.spec.size.1 as f32 - inset) * self.scale),
             &resources.module_color);
         for j in 0..inst.spec.size.1 {
-            let xl = x0 + (inst.loc.0 as f32 + inset) * self.scale;
-            let xr = x0 + ((inst.loc.0 + inst.spec.size.0) as f32 - inset) * self.scale;
-            let y = y0 + ((inst.loc.1 + j) as f32 + 0.5) * self.scale;
+            let xl = x0 + inset * self.scale;
+            let xr = x0 + (inst.spec.size.0 as f32 - inset) * self.scale;
+            let y = y0 + (j as f32 + 0.5) * self.scale;
             let width = 2.0;
             rt.draw_line((xl, y), (xl - (0.5 + inset) * self.scale, y),
                 &resources.module_color, width, None);
             rt.draw_line((xr, y), (xr + (0.5 + inset) * self.scale, y),
                 &resources.module_color, width, None);
+        }
+        let layout = &resources.text[&inst.spec.name];
+        let text_width = layout.get_metrics().width();
+        println!("layout width = {}", text_width);
+        let text_x = x0 + 0.5 * ((inst.spec.size.0 as f32) * self.scale - text_width);
+        rt.draw_text_layout((text_x, y0), layout,
+            &resources.text_color, default_text_options());
+    }
+
+    // It's a bit of a hack around poor borrowchecker design in PaintResources that we need
+    // to create the text outside the mutable borrow of the render target, rather than doing it
+    // on the fly, but on the other hand, this is potentially more efficient due to caching.
+    fn populate_text(&self, resources: &mut PaintResources, dwrite_factory: &directwrite::Factory) {
+        for inst in self.modules.iter() {
+            resources.add_text(&inst.spec.name, dwrite_factory);
         }
     }
 
@@ -390,3 +459,13 @@ impl Patcher {
     }
 }
 
+/// Make a module spec given a name.
+///
+/// This will probably grow into a registry, but for now can be basically
+/// hard-coded.
+fn make_mod_spec(name: &str) -> ModuleSpec {
+    ModuleSpec {
+        size: (2, 2),
+        name: name.into(),
+    }
+}

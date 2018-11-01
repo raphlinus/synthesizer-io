@@ -18,6 +18,6 @@ mod patcher;
 mod piano;
 mod scope;
 
-pub use self::patcher::Patcher;
+pub use self::patcher::{Patcher, PatcherAction};
 pub use self::piano::Piano;
 pub use self::scope::{Scope, ScopeCommand};

@@ -11,6 +11,7 @@ itertools = "0.7.8"
 cpal = "0.8.2"
 midir = "0.5.0"
 direct2d = "0.2.0"
+directwrite = "0.1"
 xi-win-ui = { git = "https://github.com/xi-editor/xi-win" }
 xi-win-shell = { git = "https://github.com/xi-editor/xi-win" }
 
