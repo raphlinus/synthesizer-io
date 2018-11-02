@@ -17,10 +17,10 @@
 use direct2d::brush::SolidColorBrush;
 use direct2d::RenderTarget;
 
-use xi_win_ui::{BoxConstraints, Geometry, LayoutResult, UiInner};
-use xi_win_ui::{Id, HandlerCtx, LayoutCtx, PaintCtx};
-use xi_win_ui::MouseEvent;
-use xi_win_ui::widget::Widget;
+use druid::{BoxConstraints, Geometry, LayoutResult, Ui};
+use druid::{Id, HandlerCtx, LayoutCtx, PaintCtx};
+use druid::MouseEvent;
+use druid::widget::Widget;
 
 use synthesizer_io_core::engine::NoteEvent;
 
@@ -127,7 +127,7 @@ impl Piano {
         }
     }
 
-    pub fn ui(self, ctx: &mut UiInner) -> Id {
+    pub fn ui(self, ctx: &mut Ui) -> Id {
         ctx.add(self, &[])
     }
 

@@ -24,8 +24,8 @@ use dxgi::Format;
 use winapi::um::dcommon::D2D_SIZE_U;
 use winapi::shared::basetsd::UINT32;
 
-use xi_win_ui::{BoxConstraints, HandlerCtx, LayoutCtx, LayoutResult};
-use xi_win_ui::{Id, Geometry, PaintCtx, UiInner, Widget};
+use druid::{BoxConstraints, HandlerCtx, LayoutCtx, LayoutResult};
+use druid::{Id, Geometry, PaintCtx, Ui, Widget};
 
 use synthesize_scope as s;
 
@@ -102,7 +102,7 @@ impl Scope {
         Scope { s }
     }
 
-    pub fn ui(self, ui: &mut UiInner) -> Id {
+    pub fn ui(self, ui: &mut Ui) -> Id {
         let id = ui.add(self, &[]);
         ui.poke(id, &mut ScopeCommand::Start);
         id

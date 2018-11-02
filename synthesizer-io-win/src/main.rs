@@ -18,8 +18,8 @@ extern crate cpal;
 extern crate midir;
 extern crate direct2d;
 extern crate directwrite;
-extern crate xi_win_ui;
-extern crate xi_win_shell;
+extern crate druid;
+extern crate druid_win_shell;
 extern crate synthesizer_io_core;
 extern crate synthesize_scope;
 extern crate time;
@@ -45,11 +45,11 @@ use synthesizer_io_core::worker::Worker;
 use synthesizer_io_core::graph::Node;
 use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
 
-use xi_win_shell::win_main;
-use xi_win_shell::window::WindowBuilder;
+use druid_win_shell::win_main;
+use druid_win_shell::window::WindowBuilder;
 
-use xi_win_ui::{HandlerCtx, Id, UiInner, UiMain, UiState, Widget};
-use xi_win_ui::widget::{Button, Column, Label, Padding, Row};
+use druid::{HandlerCtx, Id, Ui, UiMain, UiState, Widget};
+use druid::widget::{Button, Column, Label, Padding, Row};
 
 use grid::{Delta, WireDelta};
 use ui::{Patcher, PatcherAction, Piano, Scope, ScopeCommand};
@@ -82,7 +82,7 @@ impl Widget for SynthState {
 }
 
 impl SynthState {
-    pub fn ui(self, child: Id, ctx: &mut UiInner) -> Id {
+    pub fn ui(self, child: Id, ctx: &mut Ui) -> Id {
         ctx.add(self, &[child])
     }
 
@@ -172,7 +172,7 @@ fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
 }
 
 fn main() {
-    xi_win_shell::init();
+    druid_win_shell::init();
     let (mut worker, tx, rx) = Worker::create(1024);
     // TODO: get sample rate from cpal
     let mut engine = Engine::new(48_000.0, rx, tx);

@@ -217,6 +217,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "druid"
+version = "0.1.0"
+source = "git+https://github.com/xi-editor/druid#8fbf5e2b46b3370d73882eca53497da88f143c7f"
+dependencies = [
+ "direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "druid-win-shell 0.1.0 (git+https://github.com/xi-editor/druid)",
+ "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "druid-win-shell"
+version = "0.1.0"
+source = "git+https://github.com/xi-editor/druid#8fbf5e2b46b3370d73882eca53497da88f143c7f"
+dependencies = [
+ "direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wio 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "dxgi"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -542,6 +566,8 @@ dependencies = [
  "cpal 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "druid 0.1.0 (git+https://github.com/xi-editor/druid)",
+ "druid-win-shell 0.1.0 (git+https://github.com/xi-editor/druid)",
  "dxgi 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "midir 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -549,8 +575,6 @@ dependencies = [
  "synthesizer-io-core 0.1.0",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "xi-win-shell 0.1.0 (git+https://github.com/xi-editor/xi-win)",
- "xi-win-ui 0.1.0 (git+https://github.com/xi-editor/xi-win)",
 ]
 
 [[package]]
@@ -678,30 +702,6 @@ dependencies = [
  "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
-[[package]]
-name = "xi-win-shell"
-version = "0.1.0"
-source = "git+https://github.com/xi-editor/xi-win#de048bdbecdffff80ff97d6bf2c80f28c419455c"
-dependencies = [
- "direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
- "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "wio 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "xi-win-ui"
-version = "0.1.0"
-source = "git+https://github.com/xi-editor/xi-win#de048bdbecdffff80ff97d6bf2c80f28c419455c"
-dependencies = [
- "direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "xi-win-shell 0.1.0 (git+https://github.com/xi-editor/xi-win)",
-]
-
 [metadata]
 "checksum aho-corasick 0.6.8 (registry+https://github.com/rust-lang/crates.io-index)" = "68f56c7353e5a9547cbd76ed90f7bb5ffc3ba09d4ea9bd1d8c06c8b1142eeb5a"
 "checksum alsa 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8fd5a75e70d45a943d2a0a818277e71d6ff777e97358529d6b460d3d4c4d0745"
@@ -727,6 +727,8 @@ dependencies = [
 "checksum cpal 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d58ae1ed6536b1b233f5e3aeb6997a046ddb4d05e3f61701b58a92eb254a829e"
 "checksum direct2d 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7fa6ff10857eb253d1ae16987ebfd27372f4129b0c7a3fa41466fbdf7e453e75"
 "checksum directwrite 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8cdcd739e9351c411b8caf5cab32a27c818cfe06260595da121382ecdd22083d"
+"checksum druid 0.1.0 (git+https://github.com/xi-editor/druid)" = "<none>"
+"checksum druid-win-shell 0.1.0 (git+https://github.com/xi-editor/druid)" = "<none>"
 "checksum dxgi 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1639bbfd6765e92a40267d217a7acbac5b49320b68013f39a8e4376aa8c1e091"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3ddf21e73e016298f5cb37d6ef8e8da8e39f91f9ec8b0df44b7deb16a9f8cd5b"
@@ -784,5 +786,3 @@ dependencies = [
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 "checksum winmm-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "20a57a816b63ca4bf31aec70b4c334be13c4b73a30ab5b546135041627866035"
 "checksum wio 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f8a31e8a268d6941ffb7f8d7989fc93e4692bd3e75a27d400a72b4be1dadb213"
-"checksum xi-win-shell 0.1.0 (git+https://github.com/xi-editor/xi-win)" = "<none>"
-"checksum xi-win-ui 0.1.0 (git+https://github.com/xi-editor/xi-win)" = "<none>"

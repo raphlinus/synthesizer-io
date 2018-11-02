@@ -25,12 +25,12 @@ use direct2d::enums::{AntialiasMode, CapStyle};
 use direct2d::stroke_style::{StrokeStyle, StrokeStyleBuilder};
 use directwrite::{self, TextFormat, TextLayout};
 
-use xi_win_shell::util::default_text_options;
+use druid_win_shell::util::default_text_options;
 
-use xi_win_ui::{BoxConstraints, Geometry, LayoutResult, UiInner};
-use xi_win_ui::{Id, HandlerCtx, LayoutCtx, PaintCtx};
-use xi_win_ui::{MouseEvent, Widget};
-use xi_win_ui::widget::MouseButton;
+use druid::{BoxConstraints, Geometry, LayoutResult, Ui};
+use druid::{Id, HandlerCtx, LayoutCtx, PaintCtx};
+use druid::{MouseEvent, Widget};
+use druid::widget::MouseButton;
 
 use grid::{Delta, ModuleGrid, ModuleInstance, ModuleSpec, WireDelta, WireGrid};
 
@@ -260,7 +260,7 @@ impl Patcher {
         }
     }
 
-    pub fn ui(self, ctx: &mut UiInner) -> Id {
+    pub fn ui(self, ctx: &mut Ui) -> Id {
         ctx.add(self, &[])
     }
 
