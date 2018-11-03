@@ -107,6 +107,9 @@ impl SynthState {
                 Delta::Wire(WireDelta { grid_ix, val }) => {
                     println!("got wire delta {:?} {}", grid_ix, val);
                 }
+                Delta::Jumper(delta) => {
+                    println!("got jumper delta {:?}", delta);
+                }
                 Delta::Module(_inst) => {
                     let mut engine = self.engine.lock().unwrap();
                     engine.instantiate_module(0, ModuleType::Sin);
@@ -139,7 +142,11 @@ fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
     ui.add_listener(wire_b, move |_: &mut bool, mut ctx| {
         ctx.poke(patcher, &mut PatcherAction::WireMode);
     });
-    let mut buttons = vec![wire_b];
+    let jumper_b = Button::new("jumper").ui(ui);
+    ui.add_listener(jumper_b, move |_: &mut bool, mut ctx| {
+        ctx.poke(patcher, &mut PatcherAction::JumperMode);
+    });
+    let mut buttons = vec![wire_b, jumper_b];
     for &module in modules {
         let button = Button::new(module).ui(ui);
         ui.add_listener(button, move |_: &mut bool, mut ctx| {

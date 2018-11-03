@@ -19,6 +19,7 @@ use std::collections::HashSet;
 #[derive(Default)]
 pub struct WireGrid {
     grid: HashSet<(u16, u16, bool)>,
+    jumpers: Vec<(u16, u16, u16, u16)>,
 }
 
 #[derive(Default)]
@@ -41,6 +42,7 @@ pub struct ModuleSpec {
 #[derive(Clone, Debug)]
 pub enum Delta {
     Wire(WireDelta),
+    Jumper(JumperDelta),
     /// Add a module. Note: we need to encode moving and deleting as well, and
     /// probably have a unique id mechanism. Later.
     Module(ModuleInstance),
@@ -49,6 +51,14 @@ pub enum Delta {
 #[derive(Clone, Debug)]
 pub struct WireDelta {
     pub grid_ix: (u16, u16, bool),
+    pub val: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct JumperDelta {
+    pub start: (u16, u16),
+    pub end: (u16, u16),
+    // true for add, false for delete
     pub val: bool,
 }
 
@@ -79,8 +89,26 @@ impl WireGrid {
         }
     }
 
+    pub fn apply_jumper_delta(&mut self, delta: JumperDelta) {
+        //println!("apply jumper {:?}", delta);
+        let coords = (delta.start.0, delta.start.1, delta.end.0, delta.end.1);
+        if delta.val {
+            self.jumpers.push(coords);
+        } else {
+            if let Some(pos) = self.jumpers.iter().position(|&c| c == coords) {
+                self.jumpers.remove(pos);
+            } else {
+                println!("trying to delete nonexistent jumper");
+            }
+        }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &(u16, u16, bool)> {
         self.grid.iter()
+    }
+
+    pub fn iter_jumpers(&self) -> impl Iterator<Item = &(u16, u16, u16, u16)> {
+        self.jumpers.iter()
     }
 }
 

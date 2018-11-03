@@ -22,6 +22,7 @@ use itertools::Itertools;
 use direct2d::RenderTarget;
 use direct2d::brush::SolidColorBrush;
 use direct2d::enums::{AntialiasMode, CapStyle};
+use direct2d::math::Ellipse;
 use direct2d::stroke_style::{StrokeStyle, StrokeStyleBuilder};
 use directwrite::{self, TextFormat, TextLayout};
 
@@ -32,7 +33,7 @@ use druid::{Id, HandlerCtx, LayoutCtx, PaintCtx};
 use druid::{MouseEvent, Widget};
 use druid::widget::MouseButton;
 
-use grid::{Delta, ModuleGrid, ModuleInstance, ModuleSpec, WireDelta, WireGrid};
+use grid::{Delta, JumperDelta, ModuleGrid, ModuleInstance, ModuleSpec, WireDelta, WireGrid};
 
 pub struct Patcher {
     size: (f32, f32),
@@ -51,22 +52,29 @@ pub struct Patcher {
     modules: ModuleGrid,
     mod_hover: Option<ModuleInstance>,
     mod_name: String,
+
+    jumper_start: Option<(u16, u16)>,
+    jumper_hover: Option<(u16, u16)>,
 }
 
 #[derive(Debug)]
 pub enum PatcherAction {
     WireMode,
+    JumperMode,
     Module(String),
 }
 
+#[derive(PartialEq)]
 enum PatcherMode {
     Wire,
+    Jumper,
     Module,
 }
 
 struct PaintResources {
     grid_color: SolidColorBrush,
     wire_color: SolidColorBrush,
+    jumper_color: SolidColorBrush,
     text_color: SolidColorBrush,
     hover_ok: SolidColorBrush,
     hover_bad: SolidColorBrush,
@@ -85,13 +93,14 @@ impl PaintResources {
             .build().unwrap();
         let rt = paint_ctx.render_target();
         let grid_color = SolidColorBrush::create(rt).with_color(0x405070).build().unwrap();
-        let wire_color = SolidColorBrush::create(rt).with_color(0x808080).build().unwrap();
+        let wire_color = SolidColorBrush::create(rt).with_color(0x908060).build().unwrap();
+        let jumper_color = SolidColorBrush::create(rt).with_color(0x800000).build().unwrap();
         let text_color = SolidColorBrush::create(rt).with_color(0x303030).build().unwrap();
         let hover_ok = SolidColorBrush::create(rt).with_color((0x00c000, 0.5)).build().unwrap();
         let hover_bad = SolidColorBrush::create(rt).with_color((0xc00000, 0.5)).build().unwrap();
         let module_color = SolidColorBrush::create(rt).with_color(0xc0c0c0).build().unwrap();
-        PaintResources { grid_color, wire_color, text_color, hover_ok, hover_bad, module_color,
-            rounded,
+        PaintResources { grid_color, wire_color, jumper_color, text_color, hover_ok, hover_bad,
+            module_color, rounded,
             text: Default::default() }
     }
 
@@ -121,6 +130,10 @@ impl Widget for Patcher {
         let rt = paint_ctx.render_target();
         self.paint_wiregrid(rt, &resources, geom);
         self.paint_modules(rt, &resources, geom);
+        self.paint_jumpers(rt, &resources, geom);
+        if self.mode == PatcherMode::Jumper {
+            self.paint_jumper_hover(rt, &resources, geom);
+        }
         rt.pop_axis_aligned_clip();
     }
 
@@ -133,12 +146,13 @@ impl Widget for Patcher {
     }
 
     fn mouse(&mut self, event: &MouseEvent, ctx: &mut HandlerCtx) -> bool {
-        // Middle mouse button cycles through modes
+        // Middle mouse button cycles through modes; might be obsolete
         if event.which == MouseButton::Middle {
             if event.count > 0 {
                 let new_mode = match self.mode {
                     PatcherMode::Wire => PatcherMode::Module,
-                    PatcherMode::Module => PatcherMode::Wire,
+                    PatcherMode::Module => PatcherMode::Jumper,
+                    PatcherMode::Jumper => PatcherMode::Wire,
                 };
                 self.mode = new_mode;
                 self.update_hover(None, ctx);
@@ -174,6 +188,22 @@ impl Widget for Patcher {
                             */
                         }
                     }
+                }
+            }
+            PatcherMode::Jumper => {
+                if event.count > 0 {
+                    if let Some(start) = self.jumper_start.take() {
+                        if let Some(end) = self.jumper_hover {
+                            if start != end {
+                                let jumper_delta = JumperDelta { start, end, val: true };
+                                let delta = vec![Delta::Jumper(jumper_delta)];
+                                self.apply_and_send_delta(delta, ctx);
+                            }
+                        }
+                    } else {
+                        self.jumper_start = self.jumper_hover;
+                    }
+                    ctx.invalidate();
                 }
             }
         }
@@ -212,6 +242,11 @@ impl Widget for Patcher {
                 });
                 self.update_hover(instance, ctx);
             }
+            PatcherMode::Jumper => {
+                // NYI
+                self.jumper_hover = self.xy_to_cell(x, y);
+                ctx.invalidate();
+            }
         }
     }
 
@@ -225,6 +260,7 @@ impl Widget for Patcher {
         if let Some(action) = payload.downcast_ref::<PatcherAction>() {
             match action {
                 PatcherAction::WireMode => self.mode = PatcherMode::Wire,
+                PatcherAction::JumperMode => self.mode = PatcherMode::Jumper,
                 PatcherAction::Module(name) => {
                     self.mode = PatcherMode::Module;
                     self.mod_name = name.clone();
@@ -257,6 +293,9 @@ impl Patcher {
             modules: Default::default(),
             mod_hover: None,
             mod_name: Default::default(),
+
+            jumper_start: None,
+            jumper_hover: None,
         }
     }
 
@@ -294,6 +333,28 @@ impl Patcher {
         }
     }
 
+    fn paint_jumpers<RT>(&mut self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
+        where RT: RenderTarget
+    {
+        let x = geom.pos.0 + self.offset.0;
+        let y = geom.pos.1 + self.offset.1;
+        for (i0, j0, i1, j1) in self.grid.iter_jumpers() {
+            let x0 = x + (*i0 as f32 + 0.5) * self.scale;
+            let y0 = y + (*j0 as f32 + 0.5) * self.scale;
+            let x1 = x + (*i1 as f32 + 0.5) * self.scale;
+            let y1 = y + (*j1 as f32 + 0.5) * self.scale;
+            let s = 0.3 * self.scale / (x1 - x0).hypot(y1 - y0);
+            let xu = (x1 - x0) * s;
+            let yu = (y1 - y0) * s;
+            rt.draw_line((x0, y0), (x1, y1), &resources.wire_color, 2.0, None);
+            let r = self.scale * 0.15;
+            rt.fill_ellipse(Ellipse::new((x0, y0), r, r), &resources.wire_color);
+            rt.fill_ellipse(Ellipse::new((x1, y1), r, r), &resources.wire_color);
+            rt.draw_line((x0 + xu, y0 + yu), (x1 - xu, y1 - yu), &resources.jumper_color, 4.0,
+                None);
+        }
+    }
+
     fn paint_modules<RT>(&mut self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
         where RT: RenderTarget
     {
@@ -327,6 +388,9 @@ impl Patcher {
                 x0 + (inst.spec.size.0 as f32 - inset) * self.scale,
                 y0 + (inst.spec.size.1 as f32 - inset) * self.scale),
             &resources.module_color);
+        if inst.spec.name == "control" {
+            return;
+        }
         for j in 0..inst.spec.size.1 {
             let xl = x0 + inset * self.scale;
             let xr = x0 + (inst.spec.size.0 as f32 - inset) * self.scale;
@@ -339,10 +403,27 @@ impl Patcher {
         }
         let layout = &resources.text[&inst.spec.name];
         let text_width = layout.get_metrics().width();
-        println!("layout width = {}", text_width);
         let text_x = x0 + 0.5 * ((inst.spec.size.0 as f32) * self.scale - text_width);
         rt.draw_text_layout((text_x, y0), layout,
             &resources.text_color, default_text_options());
+    }
+
+    fn paint_jumper_hover<RT>(&self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
+        where RT: RenderTarget
+    {
+        if let Some((i, j)) = self.jumper_hover {
+            let xc = geom.pos.0 + self.offset.0 + (i as f32 + 0.5) * self.scale;
+            let yc = geom.pos.1 + self.offset.1 + (j as f32 + 0.5) * self.scale;
+            let r = self.scale * 0.15;
+            if let Some((i, j)) = self.jumper_start {
+                let xsc = geom.pos.0 + self.offset.0 + (i as f32 + 0.5) * self.scale;
+                let ysc = geom.pos.1 + self.offset.1 + (j as f32 + 0.5) * self.scale;
+                let r = self.scale * 0.15;
+                rt.draw_line((xsc, ysc), (xc, yc), &resources.wire_color, 1.5, None);
+                rt.fill_ellipse(Ellipse::new((xsc, ysc), r, r), &resources.hover_ok);
+            }
+            rt.fill_ellipse(Ellipse::new((xc, yc), r, r), &resources.hover_ok);
+        }
     }
 
     // It's a bit of a hack around poor borrowchecker design in PaintResources that we need
@@ -451,6 +532,9 @@ impl Patcher {
                 Delta::Wire(WireDelta { grid_ix, val }) => {
                     self.grid.set(*grid_ix, *val);
                 }
+                Delta::Jumper(delta) => {
+                    self.grid.apply_jumper_delta(delta.clone());
+                }
                 Delta::Module(inst) => {
                     self.modules.add(inst.clone());
                 }
@@ -464,8 +548,14 @@ impl Patcher {
 /// This will probably grow into a registry, but for now can be basically
 /// hard-coded.
 fn make_mod_spec(name: &str) -> ModuleSpec {
+    let size = match name {
+        "sine" | "saw" => (2, 1),
+        "adsr" => (2, 3),
+        "control" => (1, 1),
+        _ => (2, 2),
+    };
     ModuleSpec {
-        size: (2, 2),
+        size: size,
         name: name.into(),
     }
 }
