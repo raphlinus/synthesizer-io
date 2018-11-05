@@ -6,6 +6,7 @@ license = "Apache-2.0"
 description = "Oscilloscope style waveform visualization"
 
 [dependencies]
+fearless_simd = "0.1.1"
 
 [dev-dependencies]
 png = "0.12.0"

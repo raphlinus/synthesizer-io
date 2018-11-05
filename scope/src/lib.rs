@@ -14,6 +14,17 @@
 
 //! A renderer for a visual waveform display resembling an analog oscilloscope.
 
+extern crate fearless_simd;
+
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use fearless_simd::{AvxF32, SimdF32};
+
 /// The box beyond which the gaussian can be clipped, as a multiple of radius.
 const CLIP_FACTOR: f32 = 2.5;
 
@@ -119,16 +130,50 @@ impl Scope {
         }
     }
 
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx")]
+    unsafe fn as_rgba_body_avx(&self, im: &mut [u8]) {
+        let n = self.width * self.height;
+        assert!(n % 8 == 0);
+        assert!(n == self.glow.len());
+        assert!(n * 4 == im.len());
+        let avx = AvxF32::create();
+        let shuf = _mm256_set_epi8(
+            15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
+            15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+        for i in (0..n).step_by(8) {
+            let x = avx.from_slice(&self.glow[i..]);
+            let r = avx_sqrt_pos11(x + 0.001) * 64.0;
+            let g = avx_sqrt_pos11(x + 0.05) * 255.0;
+            let b = avx_sqrt_pos11(x + 0.13) * 224.0;
+            let r = _mm256_cvttps_epi32(r.into());
+            let g = _mm256_cvttps_epi32(g.into());
+            let b = _mm256_cvttps_epi32(b.into());
+            let a = _mm256_set1_epi32(0xff);
+            let rg = _mm256_packus_epi32(r, g);
+            let ba = _mm256_packus_epi32(b, a);
+            let rgba = _mm256_packus_epi16(rg, ba);
+            let rgba = _mm256_shuffle_epi8(rgba, shuf);
+            _mm256_storeu_si256(im.as_mut_ptr().add(i * 4) as *mut _, rgba);
+        }
+    }
+
     pub fn as_rgba(&self) -> Vec<u8> {
         let n = self.width * self.height;
         let mut im = vec![255; n * 4];
-        for i in 0..n {
-            let r = (64.0 * self.glow[i].min(1.0).sqrt()) as u8;
-            let g = (255.0 * (self.glow[i] + 0.05).min(1.0).sqrt()) as u8;
-            let b = (224.0 * (self.glow[i] + 0.13).min(1.0).sqrt()) as u8;
-            im[i * 4 + 0] = r;
-            im[i * 4 + 1] = g;
-            im[i * 4 + 2] = b;
+        if is_x86_feature_detected!("avx") {
+            unsafe { self.as_rgba_body_avx(&mut im); }
+        } else {
+            // TODO: lut is probably faster scalar fallback
+            for i in 0..n {
+                let x = self.glow[i];
+                let r = ((x + 0.001).sqrt() * 64.0).min(255.0) as u8;
+                let g = ((x + 0.05).sqrt() * 255.0).min(255.0) as u8;
+                let b = ((x + 0.13).sqrt() * 224.0).min(255.0) as u8;
+                im[i * 4 + 0] = r;
+                im[i * 4 + 1] = g;
+                im[i * 4 + 2] = b;
+            }
         }
         self.render_grid_lines(&mut im);
         im
@@ -235,6 +280,10 @@ pub fn erf_approx(x: f32) -> f32 {
     let xx = x * x;
     let x = x + (0.217 + 0.072 * xx) * (x * xx);
     x / (1.0 + x * x).sqrt()
+}
+
+fn avx_sqrt_pos11<S: SimdF32>(x: S) -> S {
+    x * x.rsqrt11()
 }
 
 #[cfg(test)]
