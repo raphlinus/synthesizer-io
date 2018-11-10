@@ -46,15 +46,12 @@ impl Default for Buffer {
     }
 }
 
-pub trait Module: MyToAny + Send {
+pub trait Module: ToAny + Send {
     /// Report the number of buffers this module is expected to generate.
     fn n_bufs_out(&self) -> usize { 0 }
 
     /// Report the number of control values this module is expected to generate.
     fn n_ctrl_out(&self) -> usize { 0 }
-
-    /// Support for downcasting
-    fn to_any(&mut self) -> &mut Any { MyToAny::my_to_any(self) }
 
     /// Give modules an opportunity to migrate state from the previous module
     /// when it is replaced.
@@ -84,10 +81,10 @@ pub trait Module: MyToAny + Send {
     fn handle_note(&mut self, midi_num: f32, velocity: f32, on: bool) {}
 }
 
-pub trait MyToAny {
-    fn my_to_any(&mut self) -> &mut Any;
+pub trait ToAny {
+    fn to_any(&mut self) -> &mut Any;
 }
 
-impl<T: Sized + 'static> MyToAny for T {
-    fn my_to_any(&mut self) -> &mut Any { self }
+impl<T: Sized + 'static> ToAny for T {
+    fn to_any(&mut self) -> &mut Any { self }
 }
