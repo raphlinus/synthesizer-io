@@ -137,4 +137,9 @@ impl ModuleGrid {
     pub fn is_conflict(&self, other: &ModuleInstance) -> bool {
         self.iter().any(|inst| inst.is_conflict(other))
     }
+
+    /// Determine the output pin of a module. Needs rework for multi-output modules.
+    pub fn determine_output_pin(inst: &ModuleInstance) -> (u16, u16) {
+        (inst.loc.0 + 2, inst.loc.1)
+    }
 }

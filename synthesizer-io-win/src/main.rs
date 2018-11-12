@@ -26,11 +26,12 @@ extern crate time;
 extern crate itertools;
 extern crate winapi;
 extern crate dxgi;
+extern crate union_find;
 
 mod grid;
+mod synth;
 mod ui;
 
-use std::any::Any;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -40,7 +41,7 @@ use midir::{MidiInput, MidiInputConnection};
 
 use synthesizer_io_core::modules;
 
-use synthesizer_io_core::engine::{Engine, ModuleType, NoteEvent};
+use synthesizer_io_core::engine::{Engine, NoteEvent};
 use synthesizer_io_core::worker::Worker;
 use synthesizer_io_core::graph::Node;
 use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
@@ -48,76 +49,12 @@ use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
 use druid_win_shell::win_main;
 use druid_win_shell::window::WindowBuilder;
 
-use druid::{HandlerCtx, Id, Ui, UiMain, UiState, Widget};
+use druid::{Id, UiMain, UiState};
 use druid::widget::{Button, Column, Label, Padding, Row};
 
-use grid::{Delta, WireDelta};
+use grid::Delta;
+use synth::{Action, SynthState};
 use ui::{Patcher, PatcherAction, Piano, Scope, ScopeCommand};
-
-/// Synthesizer engine state. This is placed in the UI as a widget so that
-/// listeners can synchronously access its state.
-struct SynthState {
-    // We probably want to move to the synth state fully owning the engine, and
-    // things like midi being routed through the synth state. But for now this
-    // should work pretty well.
-    engine: Arc<Mutex<Engine>>,
-}
-
-#[derive(Clone)]
-enum Action {
-    Note(NoteEvent),
-    Patch(Vec<Delta>),
-    Poll(Vec<f32>),
-}
-
-impl Widget for SynthState {
-    fn poke(&mut self, payload: &mut Any, _ctx: &mut HandlerCtx) -> bool {
-        if let Some(action) = payload.downcast_mut::<Action>() {
-            self.action(action);
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl SynthState {
-    pub fn ui(self, child: Id, ctx: &mut Ui) -> Id {
-        ctx.add(self, &[child])
-    }
-
-    fn action(&mut self, action: &mut Action) {
-        match *action {
-            Action::Note(ref note_event) => {
-                let mut engine = self.engine.lock().unwrap();
-                engine.dispatch_note_event(note_event);
-            }
-            Action::Patch(ref delta) => self.apply_patch_delta(delta),
-            Action::Poll(ref mut samples) => {
-                let mut engine = self.engine.lock().unwrap();
-                let _n_msg = engine.poll_rx();
-                *samples = engine.poll_monitor();
-            }
-        }
-    }
-
-    fn apply_patch_delta(&mut self, delta: &[Delta]) {
-        for d in delta {
-            match d {
-                Delta::Wire(WireDelta { grid_ix, val }) => {
-                    println!("got wire delta {:?} {}", grid_ix, val);
-                }
-                Delta::Jumper(delta) => {
-                    println!("got jumper delta {:?}", delta);
-                }
-                Delta::Module(_inst) => {
-                    let mut engine = self.engine.lock().unwrap();
-                    engine.instantiate_module(0, ModuleType::Sin);
-                }
-            }
-        }
-    }
-}
 
 fn padded_flex_row(children: &[Id], ui: &mut UiState) -> Id {
     let vec = children.iter().map(|&child|
@@ -187,7 +124,7 @@ fn main() {
 
     let engine = Arc::new(Mutex::new(engine));
 
-    let synth_state = SynthState { engine: engine.clone() };
+    let synth_state = SynthState::new(engine.clone());
 
     // Set up working graph; will probably be replaced by the engine before
     // the first audio callback runs.

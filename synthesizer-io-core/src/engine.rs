@@ -52,9 +52,6 @@ struct Core {
 
     id_alloc: IdAllocator,
 
-    // List of nodes that generate output. Maybe should be node, channel pairs.
-    output_bus: Vec<usize>,
-
     monitor_queues: Option<MonitorQueues>,
 }
 
@@ -78,6 +75,8 @@ struct ControlMap {
     decay: usize,
     sustain: usize,
     release: usize,
+
+    monitor_input: usize,
 
     note_receivers: Vec<usize>,
 }
@@ -130,8 +129,20 @@ impl Engine {
     /// Instantiate a module. Right now, the module has no inputs and the output
     /// is run directly to the output bus, but we'll soon add the ability to
     /// manipulate a wiring graph.
-    pub fn instantiate_module(&mut self, node_id: NodeId, ty: ModuleType) {
-        self.core.instantiate_module(node_id, ty);
+    ///
+    /// Returns an id for the module's output. (TODO: will obviously need work for
+    /// multi-output modules)
+    pub fn instantiate_module(&mut self, node_id: NodeId, ty: ModuleType) -> usize {
+        self.core.instantiate_module(node_id, ty)
+    }
+
+    /// Set the output bus.
+    pub fn set_outputs(&mut self, outputs: &[usize]) {
+        let sum_node = match self.midi {
+            Some(Midi { control_map: ControlMap{ monitor_input, .. }, .. }) => monitor_input,
+            _ => 0,
+        };
+        self.core.update_sum_node(sum_node, outputs);
     }
 }
 
@@ -139,9 +150,8 @@ impl Core {
     fn new(sample_rate: f32, rx: Receiver<Message>, tx: Sender<Message>) -> Core {
         let mut id_alloc = IdAllocator::new();
         id_alloc.reserve(0);
-        let output_bus = Vec::new();
         let monitor_queues = None;
-        Core { sample_rate, rx, tx, id_alloc, output_bus, monitor_queues }
+        Core { sample_rate, rx, tx, id_alloc, monitor_queues }
     }
 
     pub fn create_node<B1: IntoBoxedSlice<(usize, usize)>,
@@ -175,7 +185,7 @@ impl Core {
         self.monitor_queues = Some(MonitorQueues { tx, rx });
         let monitor = self.create_node(monitor, [(env_out, 0)], []);
 
-        self.add_output(monitor);
+        self.update_sum_node(0, &[monitor]);
 
         ControlMap {
             cutoff,
@@ -184,6 +194,7 @@ impl Core {
             decay,
             sustain,
             release,
+            monitor_input: env_out,
             note_receivers: vec![note_pitch, adsr],
         }
     }
@@ -212,15 +223,13 @@ impl Core {
         result
     }
 
-    fn add_output(&mut self, node: usize) {
-        self.output_bus.push(node);
-
+    fn update_sum_node(&mut self, sum_node: usize, outputs: &[usize]) {
         let module = Box::new(modules::Sum::new());
-        let buf_wiring: Vec<_> = self.output_bus.iter().map(|n| (*n, 0)).collect();
-        self.send_node(Node::create(module, 0, buf_wiring, []));
+        let buf_wiring: Vec<_> = outputs.iter().map(|n| (*n, 0)).collect();
+        self.send_node(Node::create(module, sum_node, buf_wiring, []));
     }
 
-    fn instantiate_module(&mut self, _node_id: NodeId, ty: ModuleType) {
+    fn instantiate_module(&mut self, _node_id: NodeId, ty: ModuleType) -> usize {
         let ll_id = match ty {
             ModuleType::Sin => {
                 let pitch = self.create_node(modules::SmoothCtrl::new(440.0f32.log2()), [], []);
@@ -228,7 +237,7 @@ impl Core {
                 self.create_node(modules::Sin::new(sample_rate), [], [(pitch, 0)])
             }
         };
-        self.add_output(ll_id);
+        ll_id
     }
 }
 
