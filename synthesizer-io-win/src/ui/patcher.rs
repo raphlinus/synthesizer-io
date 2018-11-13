@@ -131,6 +131,7 @@ impl Widget for Patcher {
         self.paint_wiregrid(rt, &resources, geom);
         self.paint_modules(rt, &resources, geom);
         self.paint_jumpers(rt, &resources, geom);
+        self.paint_pads(rt, &resources, geom);
         if self.mode == PatcherMode::Jumper {
             self.paint_jumper_hover(rt, &resources, geom);
         }
@@ -426,6 +427,20 @@ impl Patcher {
         }
     }
 
+    fn paint_pads<RT>(&self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
+        where RT: RenderTarget
+    {
+        let x0 = geom.pos.0 + self.offset.0 + (self.grid_size.0 as f32 - 0.5) * self.scale;
+        let y0 = geom.pos.1 + self.offset.1 + (self.grid_size.1 as f32 - 0.5) * self.scale;
+        let layout = &resources.text["\u{1F50A}"];
+        rt.draw_text_layout((x0 + 0.6 * self.scale, y0 - 0.4 * self.scale), layout,
+            &resources.text_color, default_text_options());
+
+        rt.draw_line((x0, y0), (x0 + 0.6 * self.scale, y0), &resources.wire_color, 3.0,
+            Some(&resources.rounded));
+
+    }
+
     // It's a bit of a hack around poor borrowchecker design in PaintResources that we need
     // to create the text outside the mutable borrow of the render target, rather than doing it
     // on the fly, but on the other hand, this is potentially more efficient due to caching.
@@ -433,6 +448,7 @@ impl Patcher {
         for inst in self.modules.iter() {
             resources.add_text(&inst.spec.name, dwrite_factory);
         }
+        resources.add_text("\u{1F50A}", dwrite_factory);
     }
 
     fn xy_to_cell(&self, x: f32, y: f32) -> Option<(u16, u16)> {

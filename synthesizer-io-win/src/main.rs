@@ -93,10 +93,13 @@ fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
     }
     let button_row = padded_flex_row(&buttons, ui);
     let mut column = Column::new();
-    column.set_flex(patcher, 2.0);
-    column.set_flex(scope, 2.0);
+    let mut mid_row = Row::new();
+    mid_row.set_flex(patcher, 3.0);
+    mid_row.set_flex(scope, 2.0);
+    let mid_row = mid_row.ui(&[patcher, scope], ui);
+    column.set_flex(mid_row, 3.0);
     column.set_flex(piano, 1.0);
-    let column = column.ui(&[button, patcher, button_row, scope, piano], ui);
+    let column = column.ui(&[button, mid_row, button_row, piano], ui);
     let synth_state = synth_state.ui(column, ui);
     ui.add_listener(patcher, move |delta: &mut Vec<Delta>, mut ctx| {
         ctx.poke_up(&mut Action::Patch(delta.clone()));

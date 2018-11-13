@@ -60,7 +60,7 @@ impl Scope {
     pub fn new(width: usize, height: usize) -> Scope {
         let glow = vec![0.0; width * height];
         let tc = 1_500.0;
-        let sweep = 0.001;
+        let sweep = 0.002;
         let horiz = 0.0;
         let gain = 1.0;
         let xylast = None;

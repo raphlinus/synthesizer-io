@@ -123,7 +123,12 @@ impl SynthState {
         self.modules.add(inst.clone());
         let output_pin_coords = ModuleGrid::determine_output_pin(inst);
         let mut engine = self.engine.lock().unwrap();
-        let ll_id = engine.instantiate_module(0, ModuleType::Sin);
+        let module_type = match inst.spec.name.as_str() {
+            "sin" => ModuleType::Sin,
+            "saw" => ModuleType::Saw,
+            _ => ModuleType::Sin,  // just to do something
+        };
+        let ll_id = engine.instantiate_module(0, module_type);
         self.outputs.insert(output_pin_coords, ll_id);
     }
 

@@ -42,6 +42,7 @@ pub type NodeId = usize;
 /// an enum, but it should do for now.
 pub enum ModuleType {
     Sin,
+    Saw,
 }
 
 /// The core owns the connection to the real-time worker.
@@ -76,7 +77,8 @@ struct ControlMap {
     sustain: usize,
     release: usize,
 
-    monitor_input: usize,
+    // node number of node that can be replaced to inject more audio
+    ext: usize,
 
     note_receivers: Vec<usize>,
 }
@@ -139,7 +141,7 @@ impl Engine {
     /// Set the output bus.
     pub fn set_outputs(&mut self, outputs: &[usize]) {
         let sum_node = match self.midi {
-            Some(Midi { control_map: ControlMap{ monitor_input, .. }, .. }) => monitor_input,
+            Some(Midi { control_map: ControlMap{ ext, .. }, .. }) => ext,
             _ => 0,
         };
         self.core.update_sum_node(sum_node, outputs);
@@ -181,9 +183,15 @@ impl Core {
             vec![(attack, 0), (decay, 0), (sustain, 0), (release, 0)]);
         let env_out = self.create_node(modules::Gain::new(), [(filter_out, 0)], [(adsr, 0)]);
 
+        let ext = self.create_node(modules::Sum::new(), [], []);
+        let ext_gain = self.create_node(modules::ConstCtrl::new(-2.0), [], []);
+        let ext_atten = self.create_node(modules::Gain::new(), [(ext, 0)], [(ext_gain, 0)]);
+
+        let monitor_in = self.create_node(modules::Sum::new(), [(env_out, 0), (ext_atten, 0)], []);
+
         let (monitor, tx, rx) = modules::Monitor::new();
         self.monitor_queues = Some(MonitorQueues { tx, rx });
-        let monitor = self.create_node(monitor, [(env_out, 0)], []);
+        let monitor = self.create_node(monitor, [(monitor_in, 0)], []);
 
         self.update_sum_node(0, &[monitor]);
 
@@ -194,7 +202,7 @@ impl Core {
             decay,
             sustain,
             release,
-            monitor_input: env_out,
+            ext,
             note_receivers: vec![note_pitch, adsr],
         }
     }
@@ -235,6 +243,11 @@ impl Core {
                 let pitch = self.create_node(modules::SmoothCtrl::new(440.0f32.log2()), [], []);
                 let sample_rate = self.sample_rate;
                 self.create_node(modules::Sin::new(sample_rate), [], [(pitch, 0)])
+            }
+            ModuleType::Saw => {
+                let pitch = self.create_node(modules::SmoothCtrl::new(440.0f32.log2()), [], []);
+                let sample_rate = self.sample_rate;
+                self.create_node(modules::Saw::new(sample_rate), [], [(pitch, 0)])
             }
         };
         ll_id
