@@ -32,7 +32,7 @@ use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat, Scope};
 use coreaudio::audio_unit::render_callback::{self, data};
 
 #[cfg(not(target_os = "macos"))]
-use cpal::{EventLoop, StreamData, UnknownTypeOutputBuffer};
+use cpal::{EventLoop, Format, SampleRate, SampleFormat, StreamData, UnknownTypeOutputBuffer};
 
 #[cfg(not(target_os = "macos"))]
 use midir::MidiInput;
@@ -122,9 +122,9 @@ impl Midi {
 }
 
 fn main() {
-    let (mut worker, tx, rx) = Worker::create(1024);
+    let (mut worker, tx, _rx) = Worker::create(1024);
 
-    /*
+    // Section uncommented to make noises without a user interface.
     let module = Box::new(modules::ConstCtrl::new(440.0f32.log2()));
     worker.handle_node(Node::create(module, 1, [], []));
     let module = Box::new(modules::Sin::new(44_100.0));
@@ -135,8 +135,9 @@ fn main() {
     worker.handle_node(Node::create(module, 4, [], [(3, 0)]));
     let module = Box::new(modules::Sum);
     worker.handle_node(Node::create(module, 0, [(2, 0), (4, 0)], []));
-    */
 
+    // Section commented out to make noises without a user interface (see above).
+/*
     let module = Box::new(modules::Saw::new(44_100.0));
     worker.handle_node(Node::create(module, 1, [], [(5, 0)]));
     let module = Box::new(modules::SmoothCtrl::new(880.0f32.log2()));
@@ -160,6 +161,7 @@ fn main() {
     worker.handle_node(Node::create(module, 13, [], []));
     let module = Box::new(modules::SmoothCtrl::new(5.0));
     worker.handle_node(Node::create(module, 14, [], []));
+*/
 
     #[cfg(target_os = "macos")]
     run_mac(worker, tx);
@@ -172,12 +174,26 @@ fn main() {
 fn run_cpal(mut worker: Worker, tx: Sender<Message>) {
     let event_loop = EventLoop::new();
     let device = cpal::default_output_device().expect("no output device");
+
+/*
     let mut supported_formats_range = device.supported_output_formats()
         .expect("error while querying formats");
     let format = supported_formats_range.next()
         .expect("no supported format?!")
         .with_max_sample_rate();
     println!("format: {:?}", format);
+*/
+    // On Ubuntu 18.04 with Pulseaudio, the "with_max_sample_rate" method returns
+    //   Format { channels: 1, sample_rate: SampleRate(192_000), data_type: I16 }
+    // but the code assumes:
+    //   Format { channels: 2, sample_rate: SampleRate(44_100), data_type: F32 }
+    // so we might as well hard-wire it.
+    let format = Format{
+        channels: 2,
+        sample_rate: SampleRate(44_100),
+        data_type: SampleFormat::F32,
+    };
+
     let stream_id = event_loop.build_output_stream(&device, &format).unwrap();
     event_loop.play_stream(stream_id);
 
@@ -200,7 +216,11 @@ fn run_cpal(mut worker: Worker, tx: Sender<Message>) {
                 let mut buf_slice = buf.deref_mut();
                 let mut i = 0;
                 let mut timestamp = time::precise_time_ns();
-                while i < buf_slice.len() {
+                // cpal might return a buffer whose length is not a multiple of
+                // 64 (i.e. 8820): if we try to fill the too short tail we get
+                // an "index out of bounds" panic. The resulting audio is
+                // scratchy though, because we're not filling the whole buffer.
+                while i < buf_slice.len() / (2 * N_SAMPLES_PER_CHUNK) * (2 * N_SAMPLES_PER_CHUNK) {
                     // should let the graph generate stereo
                     let buf = worker.work(timestamp)[0].get();
                     for j in 0..N_SAMPLES_PER_CHUNK {
