@@ -14,11 +14,11 @@
 
 //! A module that makes a band-limited sawtooth wave.
 
+use std::cmp::min;
 use std::f32::consts;
 use std::ops::Deref;
-use std::cmp::min;
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 const LG_N_SAMPLES: usize = 10;
 const N_SAMPLES: usize = (1 << LG_N_SAMPLES);
@@ -93,11 +93,17 @@ fn compute(tab_ix: usize, phasefrac: f32) -> f32 {
 }
 
 impl Module for Saw {
-    fn n_bufs_out(&self) -> usize { 1 }
+    fn n_bufs_out(&self) -> usize {
+        1
+    }
 
-    fn process(&mut self, control_in: &[f32], _control_out: &mut [f32],
-        _buf_in: &[&Buffer], buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        control_in: &[f32],
+        _control_out: &mut [f32],
+        _buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+    ) {
         let logf = control_in[0] + self.sr_offset;
         let slice_off = -SLICE_BASE - LG_N_SAMPLES as f32;
         let slice = (logf + slice_off) * SLICES_PER_OCTAVE as f32;

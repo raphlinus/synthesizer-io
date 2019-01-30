@@ -14,8 +14,8 @@
 
 //! A module for monitoring an audio signal.
 
-use module::{Module, Buffer};
-use queue::{Item, Queue, Receiver, Sender};
+use crate::module::{Buffer, Module};
+use crate::queue::{Item, Queue, Receiver, Sender};
 
 pub struct Monitor {
     buf_pool: Vec<Item<Vec<f32>>>,
@@ -35,17 +35,27 @@ impl Monitor {
         for _ in 0..POOL_SIZE {
             buf_pool.push(Item::make_item(Vec::with_capacity(BUF_SIZE)));
         }
-        let monitor = Monitor { buf_pool, to_monitor, from_monitor };
+        let monitor = Monitor {
+            buf_pool,
+            to_monitor,
+            from_monitor,
+        };
         (monitor, tx, rx)
     }
 }
 
 impl Module for Monitor {
-    fn n_bufs_out(&self) -> usize { 1 }
+    fn n_bufs_out(&self) -> usize {
+        1
+    }
 
-    fn process(&mut self, _control_in: &[f32], _control_out: &mut [f32],
-        buf_in: &[&Buffer], buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        _control_in: &[f32],
+        _control_out: &mut [f32],
+        buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+    ) {
         let cur_buf = self.buf_pool.pop();
 
         // Note: non-allocation depends on this not overflowing.
@@ -59,7 +69,7 @@ impl Module for Monitor {
 
         if let Some(mut cur_buf) = cur_buf {
             cur_buf.extend_from_slice(buf);
-            if cur_buf.len() + buf.len() > cur_buf.capacity () {
+            if cur_buf.len() + buf.len() > cur_buf.capacity() {
                 self.from_monitor.send_item(cur_buf);
             } else {
                 self.buf_pool.push(cur_buf);

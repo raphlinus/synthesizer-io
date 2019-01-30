@@ -19,21 +19,23 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use direct2d::RenderTarget;
 use direct2d::brush::SolidColorBrush;
 use direct2d::enums::{AntialiasMode, CapStyle};
 use direct2d::math::Ellipse;
 use direct2d::stroke_style::{StrokeStyle, StrokeStyleBuilder};
+use direct2d::RenderTarget;
 use directwrite::{self, TextFormat, TextLayout};
 
 use druid_win_shell::util::default_text_options;
 
-use druid::{BoxConstraints, Geometry, LayoutResult, Ui};
-use druid::{Id, HandlerCtx, LayoutCtx, PaintCtx};
-use druid::{MouseEvent, Widget};
 use druid::widget::MouseButton;
+use druid::{BoxConstraints, Geometry, LayoutResult, Ui};
+use druid::{HandlerCtx, Id, LayoutCtx, PaintCtx};
+use druid::{MouseEvent, Widget};
 
-use grid::{Delta, JumperDelta, ModuleGrid, ModuleInstance, ModuleSpec, WireDelta, WireGrid};
+use crate::grid::{
+    Delta, JumperDelta, ModuleGrid, ModuleInstance, ModuleSpec, WireDelta, WireGrid,
+};
 
 pub struct Patcher {
     size: (f32, f32),
@@ -44,7 +46,6 @@ pub struct Patcher {
     mode: PatcherMode,
 
     // These next are per-mode state, might want to move into mode enum.
-
     grid: WireGrid,
     last_xy: Option<(f32, f32)>,
     draw_mode: Option<bool>,
@@ -90,23 +91,53 @@ impl PaintResources {
         let rounded = StrokeStyleBuilder::new(paint_ctx.d2d_factory())
             .with_start_cap(CapStyle::Round)
             .with_end_cap(CapStyle::Round)
-            .build().unwrap();
+            .build()
+            .unwrap();
         let rt = paint_ctx.render_target();
-        let grid_color = SolidColorBrush::create(rt).with_color(0x405070).build().unwrap();
-        let wire_color = SolidColorBrush::create(rt).with_color(0x908060).build().unwrap();
-        let jumper_color = SolidColorBrush::create(rt).with_color(0x800000).build().unwrap();
-        let text_color = SolidColorBrush::create(rt).with_color(0x303030).build().unwrap();
-        let hover_ok = SolidColorBrush::create(rt).with_color((0x00c000, 0.5)).build().unwrap();
-        let hover_bad = SolidColorBrush::create(rt).with_color((0xc00000, 0.5)).build().unwrap();
-        let module_color = SolidColorBrush::create(rt).with_color(0xc0c0c0).build().unwrap();
-        PaintResources { grid_color, wire_color, jumper_color, text_color, hover_ok, hover_bad,
-            module_color, rounded,
-            text: Default::default() }
+        let grid_color = SolidColorBrush::create(rt)
+            .with_color(0x405070)
+            .build()
+            .unwrap();
+        let wire_color = SolidColorBrush::create(rt)
+            .with_color(0x908060)
+            .build()
+            .unwrap();
+        let jumper_color = SolidColorBrush::create(rt)
+            .with_color(0x800000)
+            .build()
+            .unwrap();
+        let text_color = SolidColorBrush::create(rt)
+            .with_color(0x303030)
+            .build()
+            .unwrap();
+        let hover_ok = SolidColorBrush::create(rt)
+            .with_color((0x00c000, 0.5))
+            .build()
+            .unwrap();
+        let hover_bad = SolidColorBrush::create(rt)
+            .with_color((0xc00000, 0.5))
+            .build()
+            .unwrap();
+        let module_color = SolidColorBrush::create(rt)
+            .with_color(0xc0c0c0)
+            .build()
+            .unwrap();
+        PaintResources {
+            grid_color,
+            wire_color,
+            jumper_color,
+            text_color,
+            hover_ok,
+            hover_bad,
+            module_color,
+            rounded,
+            text: Default::default(),
+        }
     }
 
     fn add_text(&mut self, text: &str, dwrite_factory: &directwrite::Factory) {
         if !self.text.contains_key(text) {
-                let format = TextFormat::create(dwrite_factory)
+            let format = TextFormat::create(dwrite_factory)
                 .with_family("Segoe UI")
                 .with_size(11.0)
                 .build()
@@ -116,7 +147,8 @@ impl PaintResources {
                 .with_font(&format)
                 .with_width(1e6)
                 .with_height(1e6)
-                .build().unwrap();
+                .build()
+                .unwrap();
             self.text.insert(text.to_string(), layout);
         }
     }
@@ -138,9 +170,13 @@ impl Widget for Patcher {
         rt.pop_axis_aligned_clip();
     }
 
-    fn layout(&mut self, bc: &BoxConstraints, _children: &[Id], _size: Option<(f32, f32)>,
-        _ctx: &mut LayoutCtx) -> LayoutResult
-    {
+    fn layout(
+        &mut self,
+        bc: &BoxConstraints,
+        _children: &[Id],
+        _size: Option<(f32, f32)>,
+        _ctx: &mut LayoutCtx,
+    ) -> LayoutResult {
         let size = bc.constrain((100.0, 100.0));
         self.size = size;
         LayoutResult::Size(size)
@@ -196,7 +232,11 @@ impl Widget for Patcher {
                     if let Some(start) = self.jumper_start.take() {
                         if let Some(end) = self.jumper_hover {
                             if start != end {
-                                let jumper_delta = JumperDelta { start, end, val: true };
+                                let jumper_delta = JumperDelta {
+                                    start,
+                                    end,
+                                    val: true,
+                                };
                                 let delta = vec![Delta::Jumper(jumper_delta)];
                                 self.apply_and_send_delta(delta, ctx);
                             }
@@ -238,9 +278,9 @@ impl Widget for Patcher {
                 };
                 let xc = x - 0.5 * self.scale * (spec.size.0 as f32 - 1.0);
                 let yc = y - 0.5 * self.scale * (spec.size.1 as f32 - 1.0);
-                let instance = self.xy_to_cell(xc, yc).map(|loc| {
-                    ModuleInstance { loc, spec }
-                });
+                let instance = self
+                    .xy_to_cell(xc, yc)
+                    .map(|loc| ModuleInstance { loc, spec });
                 self.update_hover(instance, ctx);
             }
             PatcherMode::Jumper => {
@@ -304,38 +344,62 @@ impl Patcher {
         ctx.add(self, &[])
     }
 
-
     // We actually have RT = GenericRenderTarget in the current impl. This could be a simple
     // type alias instead of parameterization. I'm wondering whether there might be a better
     // way to do this, but of course ultimately all this stuff should be wrapped to make it
     // less platform specific.
     fn paint_wiregrid<RT>(&mut self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
-        where RT: RenderTarget
+    where
+        RT: RenderTarget,
     {
         rt.push_axis_aligned_clip(geom, AntialiasMode::Aliased);
         let x0 = geom.pos.0 + self.offset.0;
         let y0 = geom.pos.1 + self.offset.1;
         for i in 0..(self.grid_size.0 + 1) {
-            rt.draw_line((x0 + self.scale * (i as f32), y0),
-                (x0 + self.scale * (i as f32), y0 + self.scale * (self.grid_size.1 as f32)),
-                &resources.grid_color, 1.0, None);
+            rt.draw_line(
+                (x0 + self.scale * (i as f32), y0),
+                (
+                    x0 + self.scale * (i as f32),
+                    y0 + self.scale * (self.grid_size.1 as f32),
+                ),
+                &resources.grid_color,
+                1.0,
+                None,
+            );
         }
         for i in 0..(self.grid_size.1 + 1) {
-            rt.draw_line((x0, y0 + self.scale * (i as f32)),
-                (x0 + self.scale * (self.grid_size.0 as f32), y0 + self.scale * (i as f32)),
-                &resources.grid_color, 1.0, None);
+            rt.draw_line(
+                (x0, y0 + self.scale * (i as f32)),
+                (
+                    x0 + self.scale * (self.grid_size.0 as f32),
+                    y0 + self.scale * (i as f32),
+                ),
+                &resources.grid_color,
+                1.0,
+                None,
+            );
         }
         for (i, j, vert) in self.grid.iter() {
             let x = x0 + (*i as f32 + 0.5) * self.scale;
             let y = y0 + (*j as f32 + 0.5) * self.scale;
-            let (x1, y1) = if *vert { (x, y + self.scale) } else { (x + self.scale, y) };
-            rt.draw_line((x, y), (x1, y1), &resources.wire_color, 3.0,
-                Some(&resources.rounded));
+            let (x1, y1) = if *vert {
+                (x, y + self.scale)
+            } else {
+                (x + self.scale, y)
+            };
+            rt.draw_line(
+                (x, y),
+                (x1, y1),
+                &resources.wire_color,
+                3.0,
+                Some(&resources.rounded),
+            );
         }
     }
 
     fn paint_jumpers<RT>(&mut self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
-        where RT: RenderTarget
+    where
+        RT: RenderTarget,
     {
         let x = geom.pos.0 + self.offset.0;
         let y = geom.pos.1 + self.offset.1;
@@ -351,13 +415,19 @@ impl Patcher {
             let r = self.scale * 0.15;
             rt.fill_ellipse(Ellipse::new((x0, y0), r, r), &resources.wire_color);
             rt.fill_ellipse(Ellipse::new((x1, y1), r, r), &resources.wire_color);
-            rt.draw_line((x0 + xu, y0 + yu), (x1 - xu, y1 - yu), &resources.jumper_color, 4.0,
-                None);
+            rt.draw_line(
+                (x0 + xu, y0 + yu),
+                (x1 - xu, y1 - yu),
+                &resources.jumper_color,
+                4.0,
+                None,
+            );
         }
     }
 
     fn paint_modules<RT>(&mut self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
-        where RT: RenderTarget
+    where
+        RT: RenderTarget,
     {
         for inst in self.modules.iter() {
             self.paint_module(rt, resources, geom, inst);
@@ -372,23 +442,39 @@ impl Patcher {
             } else {
                 &resources.hover_bad
             };
-            rt.fill_rectangle((x0 + (i as f32) * self.scale, y0 + (j as f32) * self.scale,
-                    x0 + ((i + w) as f32) * self.scale, y0 + ((j + h) as f32) * self.scale),
-                color);
+            rt.fill_rectangle(
+                (
+                    x0 + (i as f32) * self.scale,
+                    y0 + (j as f32) * self.scale,
+                    x0 + ((i + w) as f32) * self.scale,
+                    y0 + ((j + h) as f32) * self.scale,
+                ),
+                color,
+            );
         }
     }
 
-    fn paint_module<RT>(&self, rt: &mut RT, resources: &PaintResources, geom: &Geometry,
-        inst: &ModuleInstance) where RT: RenderTarget
+    fn paint_module<RT>(
+        &self,
+        rt: &mut RT,
+        resources: &PaintResources,
+        geom: &Geometry,
+        inst: &ModuleInstance,
+    ) where
+        RT: RenderTarget,
     {
         let x0 = geom.pos.0 + self.offset.0 + (inst.loc.0 as f32) * self.scale;
         let y0 = geom.pos.1 + self.offset.1 + (inst.loc.1 as f32) * self.scale;
         let inset = 0.1;
-        rt.fill_rectangle((x0 + inset * self.scale,
+        rt.fill_rectangle(
+            (
+                x0 + inset * self.scale,
                 y0 + inset * self.scale,
                 x0 + (inst.spec.size.0 as f32 - inset) * self.scale,
-                y0 + (inst.spec.size.1 as f32 - inset) * self.scale),
-            &resources.module_color);
+                y0 + (inst.spec.size.1 as f32 - inset) * self.scale,
+            ),
+            &resources.module_color,
+        );
         if inst.spec.name == "control" {
             return;
         }
@@ -397,20 +483,35 @@ impl Patcher {
             let xr = x0 + (inst.spec.size.0 as f32 - inset) * self.scale;
             let y = y0 + (j as f32 + 0.5) * self.scale;
             let width = 2.0;
-            rt.draw_line((xl, y), (xl - (0.5 + inset) * self.scale, y),
-                &resources.module_color, width, None);
-            rt.draw_line((xr, y), (xr + (0.5 + inset) * self.scale, y),
-                &resources.module_color, width, None);
+            rt.draw_line(
+                (xl, y),
+                (xl - (0.5 + inset) * self.scale, y),
+                &resources.module_color,
+                width,
+                None,
+            );
+            rt.draw_line(
+                (xr, y),
+                (xr + (0.5 + inset) * self.scale, y),
+                &resources.module_color,
+                width,
+                None,
+            );
         }
         let layout = &resources.text[&inst.spec.name];
         let text_width = layout.get_metrics().width();
         let text_x = x0 + 0.5 * ((inst.spec.size.0 as f32) * self.scale - text_width);
-        rt.draw_text_layout((text_x, y0), layout,
-            &resources.text_color, default_text_options());
+        rt.draw_text_layout(
+            (text_x, y0),
+            layout,
+            &resources.text_color,
+            default_text_options(),
+        );
     }
 
     fn paint_jumper_hover<RT>(&self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
-        where RT: RenderTarget
+    where
+        RT: RenderTarget,
     {
         if let Some((i, j)) = self.jumper_hover {
             let xc = geom.pos.0 + self.offset.0 + (i as f32 + 0.5) * self.scale;
@@ -428,17 +529,26 @@ impl Patcher {
     }
 
     fn paint_pads<RT>(&self, rt: &mut RT, resources: &PaintResources, geom: &Geometry)
-        where RT: RenderTarget
+    where
+        RT: RenderTarget,
     {
         let x0 = geom.pos.0 + self.offset.0 + (self.grid_size.0 as f32 - 0.5) * self.scale;
         let y0 = geom.pos.1 + self.offset.1 + (self.grid_size.1 as f32 - 0.5) * self.scale;
         let layout = &resources.text["\u{1F50A}"];
-        rt.draw_text_layout((x0 + 0.6 * self.scale, y0 - 0.4 * self.scale), layout,
-            &resources.text_color, default_text_options());
+        rt.draw_text_layout(
+            (x0 + 0.6 * self.scale, y0 - 0.4 * self.scale),
+            layout,
+            &resources.text_color,
+            default_text_options(),
+        );
 
-        rt.draw_line((x0, y0), (x0 + 0.6 * self.scale, y0), &resources.wire_color, 3.0,
-            Some(&resources.rounded));
-
+        rt.draw_line(
+            (x0, y0),
+            (x0 + 0.6 * self.scale, y0),
+            &resources.wire_color,
+            3.0,
+            Some(&resources.rounded),
+        );
     }
 
     // It's a bit of a hack around poor borrowchecker design in PaintResources that we need
@@ -508,7 +618,6 @@ impl Patcher {
         }
         if u1.floor() != last_u || v1.floor() != last_v {
             vec.extend(self.guard_point(u1, v1));
-
         }
         vec
     }

@@ -16,9 +16,9 @@
 
 use std::ops::Deref;
 
-use queue::{Queue, Sender, Receiver, Item};
-use module::Buffer;
-use graph::{Graph, Node, Message};
+use crate::graph::{Graph, Message, Node};
+use crate::module::Buffer;
+use crate::queue::{Item, Queue, Receiver, Sender};
 
 pub struct Worker {
     to_worker: Receiver<Message>,

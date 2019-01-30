@@ -17,10 +17,10 @@
 use direct2d::brush::SolidColorBrush;
 use direct2d::RenderTarget;
 
-use druid::{BoxConstraints, Geometry, LayoutResult, Ui};
-use druid::{Id, HandlerCtx, LayoutCtx, PaintCtx};
-use druid::MouseEvent;
 use druid::widget::Widget;
+use druid::MouseEvent;
+use druid::{BoxConstraints, Geometry, LayoutResult, Ui};
+use druid::{HandlerCtx, Id, LayoutCtx, PaintCtx};
 
 use synthesizer_io_core::engine::NoteEvent;
 
@@ -59,15 +59,30 @@ const INSET: f32 = 2.0;
 impl Widget for Piano {
     fn paint(&mut self, paint_ctx: &mut PaintCtx, geom: &Geometry) {
         let rt = paint_ctx.render_target();
-        let black = SolidColorBrush::create(rt).with_color(0x080800).build().unwrap();
-        let white = SolidColorBrush::create(rt).with_color(0xf0f0ea).build().unwrap();
-        let active = SolidColorBrush::create(rt).with_color(0x107010).build().unwrap();
+        let black = SolidColorBrush::create(rt)
+            .with_color(0x080800)
+            .build()
+            .unwrap();
+        let white = SolidColorBrush::create(rt)
+            .with_color(0xf0f0ea)
+            .build()
+            .unwrap();
+        let active = SolidColorBrush::create(rt)
+            .with_color(0x107010)
+            .build()
+            .unwrap();
         let (x, y) = geom.pos;
 
         for note in self.start_note..self.end_note {
             let (u0, v0, u1, v1) = self.note_geom(note);
-            let color = if self.pressed[note as usize] { &active } else {
-                if v0 == 0.0 { &black } else { &white }
+            let color = if self.pressed[note as usize] {
+                &active
+            } else {
+                if v0 == 0.0 {
+                    &black
+                } else {
+                    &white
+                }
             };
             let x0 = x + u0 * geom.size.0 + INSET;
             let y0 = y + v0 * geom.size.1 + INSET;
@@ -78,9 +93,13 @@ impl Widget for Piano {
         }
     }
 
-    fn layout(&mut self, bc: &BoxConstraints, _children: &[Id], _size: Option<(f32, f32)>,
-        _ctx: &mut LayoutCtx) -> LayoutResult
-    {
+    fn layout(
+        &mut self,
+        bc: &BoxConstraints,
+        _children: &[Id],
+        _size: Option<(f32, f32)>,
+        _ctx: &mut LayoutCtx,
+    ) -> LayoutResult {
         let size = bc.constrain((100.0, 100.0));
         self.size = size;
         LayoutResult::Size(size)
@@ -91,7 +110,7 @@ impl Widget for Piano {
             ctx.set_active(true);
             let u = event.x / self.size.0;
             let v = event.y / self.size.1;
-            for note in self.start_note .. self.end_note {
+            for note in self.start_note..self.end_note {
                 let (u0, v0, u1, v1) = self.note_geom(note);
                 if u >= u0 && u < u1 && v >= v0 && v < v1 {
                     self.cur_note = Some(note);
@@ -100,14 +119,22 @@ impl Widget for Piano {
             }
             if let Some(note) = self.cur_note {
                 self.pressed[note as usize] = true;
-                ctx.send_event(NoteEvent { down: true, note: note, velocity: 100 });
+                ctx.send_event(NoteEvent {
+                    down: true,
+                    note: note,
+                    velocity: 100,
+                });
                 ctx.invalidate();
             }
         } else {
             ctx.set_active(false);
             if let Some(note) = self.cur_note {
                 self.pressed[note as usize] = false;
-                ctx.send_event(NoteEvent { down: false, note: note, velocity: 0 });
+                ctx.send_event(NoteEvent {
+                    down: false,
+                    note: note,
+                    velocity: 0,
+                });
                 ctx.invalidate();
             }
             self.cur_note = None;

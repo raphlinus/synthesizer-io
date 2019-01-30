@@ -1,11 +1,11 @@
 // Copyright 2018 The Synthesizer IO Authors.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     https://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -65,7 +65,17 @@ impl Scope {
         let gain = 1.0;
         let xylast = None;
         let state = ScopeState::WaitingForTrigger(-1.0);
-        Scope { width, height, glow, tc, sweep, horiz, gain, xylast, state }
+        Scope {
+            width,
+            height,
+            glow,
+            tc,
+            sweep,
+            horiz,
+            gain,
+            xylast,
+            state,
+        }
     }
 
     // Add a dot to the glow.
@@ -139,8 +149,9 @@ impl Scope {
         assert!(n * 4 == im.len());
         let avx = AvxF32::create();
         let shuf = _mm256_set_epi8(
-            15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0,
-            15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0);
+            15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0, 15, 11, 7, 3, 14, 10, 6, 2, 13,
+            9, 5, 1, 12, 8, 4, 0,
+        );
         for i in (0..n).step_by(8) {
             let x = avx.from_slice(&self.glow[i..]);
             let r = avx_sqrt_pos11(x + 0.001) * 64.0;
@@ -162,7 +173,9 @@ impl Scope {
         let n = self.width * self.height;
         let mut im = vec![255; n * 4];
         if is_x86_feature_detected!("avx") {
-            unsafe { self.as_rgba_body_avx(&mut im); }
+            unsafe {
+                self.as_rgba_body_avx(&mut im);
+            }
         } else {
             // TODO: lut is probably faster scalar fallback
             for i in 0..n {

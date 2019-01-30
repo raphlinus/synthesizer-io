@@ -14,7 +14,7 @@
 
 //! A simple module that just sets a constant control parameter.
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 pub struct ConstCtrl {
     value: f32,
@@ -27,11 +27,17 @@ impl ConstCtrl {
 }
 
 impl Module for ConstCtrl {
-    fn n_ctrl_out(&self) -> usize { 1 }
+    fn n_ctrl_out(&self) -> usize {
+        1
+    }
 
-    fn process(&mut self, _control_in: &[f32], control_out: &mut [f32],
-        _buf_in: &[&Buffer], _buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        _control_in: &[f32],
+        control_out: &mut [f32],
+        _buf_in: &[&Buffer],
+        _buf_out: &mut [Buffer],
+    ) {
         control_out[0] = self.value;
     }
 }

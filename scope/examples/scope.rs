@@ -1,11 +1,11 @@
 // Copyright 2018 The Synthesizer IO Authors.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     https://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,7 +27,10 @@ use png::HasParameters;
 use synthesize_scope::gauss_approx;
 use synthesize_scope::Scope;
 
-fn mk_uvmap_img<F>(f: F) -> Vec<u8> where F: Fn(f32, f32) -> f32 {
+fn mk_uvmap_img<F>(f: F) -> Vec<u8>
+where
+    F: Fn(f32, f32) -> f32,
+{
     let w = 640;
     let h = 480;
     let scale = 2.0 / (w.min(h) as f32);

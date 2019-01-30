@@ -14,16 +14,22 @@
 
 //! A simple module that makes a harsh buzzing noise.
 
-use module::{Module, Buffer, N_SAMPLES_PER_CHUNK};
+use crate::module::{Buffer, Module, N_SAMPLES_PER_CHUNK};
 
 pub struct Buzz;
 
 impl Module for Buzz {
-    fn n_bufs_out(&self) -> usize { 1 }
+    fn n_bufs_out(&self) -> usize {
+        1
+    }
 
-    fn process(&mut self, _control_in: &[f32], _control_out: &mut [f32],
-        _buf_in: &[&Buffer], buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        _control_in: &[f32],
+        _control_out: &mut [f32],
+        _buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+    ) {
         let out = buf_out[0].get_mut();
         for i in 0..out.len() {
             out[i] = i as f32 * (2.0 / N_SAMPLES_PER_CHUNK as f32) - 1.0;

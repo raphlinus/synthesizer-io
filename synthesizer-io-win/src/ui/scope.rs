@@ -21,11 +21,11 @@ use direct2d::image::Bitmap;
 use direct2d::math::SizeU;
 use direct2d::RenderTarget;
 use dxgi::Format;
-use winapi::um::dcommon::D2D_SIZE_U;
 use winapi::shared::basetsd::UINT32;
+use winapi::um::dcommon::D2D_SIZE_U;
 
 use druid::{BoxConstraints, HandlerCtx, LayoutCtx, LayoutResult};
-use druid::{Id, Geometry, PaintCtx, Ui, Widget};
+use druid::{Geometry, Id, PaintCtx, Ui, Widget};
 
 use synthesize_scope as s;
 
@@ -50,12 +50,15 @@ impl Widget for Scope {
         let b = Bitmap::create(rt)
             .with_raw_data(
                 SizeU(D2D_SIZE_U {
-                    width: w as UINT32, height: h as UINT32
+                    width: w as UINT32,
+                    height: h as UINT32,
                 }),
                 &data,
-                w as UINT32 * 4)
+                w as UINT32 * 4,
+            )
             .with_format(Format::R8G8B8A8Unorm)
-            .build().expect("error creating bitmap");
+            .build()
+            .expect("error creating bitmap");
         let height = geom.size.1.min(0.75 * geom.size.0);
         let width = height * (1.0 / 0.75);
         let x0 = geom.pos.0;
@@ -69,9 +72,13 @@ impl Widget for Scope {
         );
     }
 
-    fn layout(&mut self, bc: &BoxConstraints, _children: &[Id], _size: Option<(f32, f32)>,
-        _ctx: &mut LayoutCtx) -> LayoutResult
-    {
+    fn layout(
+        &mut self,
+        bc: &BoxConstraints,
+        _children: &[Id],
+        _size: Option<(f32, f32)>,
+        _ctx: &mut LayoutCtx,
+    ) -> LayoutResult {
         let size = bc.constrain((100.0, 100.0));
         //self.size = size;
         LayoutResult::Size(size)
@@ -120,6 +127,5 @@ impl Scope {
             }
             xylast = Some((x, y));
         }
-
     }
 }

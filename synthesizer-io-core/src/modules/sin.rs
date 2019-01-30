@@ -17,7 +17,7 @@
 use std::f32::consts;
 use std::ops::Deref;
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 const LG_N_SAMPLES: usize = 10;
 const N_SAMPLES: usize = (1 << LG_N_SAMPLES);
@@ -54,7 +54,9 @@ impl Sin {
 }
 
 impl Module for Sin {
-    fn n_bufs_out(&self) -> usize { 1 }
+    fn n_bufs_out(&self) -> usize {
+        1
+    }
 
     // Example of migration, although replacing one Sin module with another
     // isn't going to have much use unless the sample rate is changing. But
@@ -65,9 +67,13 @@ impl Module for Sin {
         }
     }
 
-    fn process(&mut self, control_in: &[f32], _control_out: &mut [f32],
-        _buf_in: &[&Buffer], buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        control_in: &[f32],
+        _control_out: &mut [f32],
+        _buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+    ) {
         let freq = (control_in[0] + self.sr_offset).exp2();
         let tab = SINTAB.deref();
         let out = buf_out[0].get_mut();

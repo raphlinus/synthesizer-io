@@ -14,20 +14,6 @@
 
 //! Windows GUI music synthesizer app.
 
-extern crate cpal;
-extern crate midir;
-extern crate direct2d;
-extern crate directwrite;
-extern crate druid;
-extern crate druid_win_shell;
-extern crate synthesizer_io_core;
-extern crate synthesize_scope;
-extern crate time;
-extern crate itertools;
-extern crate winapi;
-extern crate dxgi;
-extern crate union_find;
-
 mod grid;
 mod synth;
 mod ui;
@@ -177,7 +163,7 @@ fn run_cpal(mut worker: Worker) {
     event_loop.run(move |_stream_id, stream_data| {
         match stream_data {
             StreamData::Output { buffer: UnknownTypeOutputBuffer::F32(mut buf) } => {
-                let mut buf_slice = buf.deref_mut();
+                let buf_slice = buf.deref_mut();
                 let mut i = 0;
                 let mut timestamp = time::precise_time_ns();
                 while i < buf_slice.len() {

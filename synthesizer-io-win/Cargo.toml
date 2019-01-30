@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Raph Levien <raph.levien@gmail.com>"]
 license = "Apache 2.0"
 description = "Windows UI synthesizer app"
+edition = "2018"
 
 [dependencies]
 time = "0.1"

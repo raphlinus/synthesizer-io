@@ -14,7 +14,7 @@
 
 //! A simple module that just sums the inputs.
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 pub struct Sum;
 
@@ -25,11 +25,17 @@ impl Sum {
 }
 
 impl Module for Sum {
-    fn n_bufs_out(&self) -> usize { 1 }
+    fn n_bufs_out(&self) -> usize {
+        1
+    }
 
-    fn process(&mut self, _control_in: &[f32], _control_out: &mut [f32],
-        buf_in: &[&Buffer], buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        _control_in: &[f32],
+        _control_out: &mut [f32],
+        buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+    ) {
         let out = buf_out[0].get_mut();
         for i in 0..out.len() {
             out[i] = 0.0;
