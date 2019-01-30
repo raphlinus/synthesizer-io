@@ -28,23 +28,25 @@ use midir::{MidiInput, MidiInputConnection};
 use synthesizer_io_core::modules;
 
 use synthesizer_io_core::engine::{Engine, NoteEvent};
-use synthesizer_io_core::worker::Worker;
 use synthesizer_io_core::graph::Node;
 use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
+use synthesizer_io_core::worker::Worker;
 
 use druid_win_shell::win_main;
 use druid_win_shell::window::WindowBuilder;
 
-use druid::{Id, UiMain, UiState};
 use druid::widget::{Button, Column, Label, Padding, Row};
+use druid::{Id, UiMain, UiState};
 
 use grid::Delta;
 use synth::{Action, SynthState};
 use ui::{Patcher, PatcherAction, Piano, Scope, ScopeCommand};
 
 fn padded_flex_row(children: &[Id], ui: &mut UiState) -> Id {
-    let vec = children.iter().map(|&child|
-        Padding::uniform(5.0).ui(child, ui)).collect::<Vec<_>>();
+    let vec = children
+        .iter()
+        .map(|&child| Padding::uniform(5.0).ui(child, ui))
+        .collect::<Vec<_>>();
     let mut row = Row::new();
     for &child in &vec {
         row.set_flex(child, 1.0);
@@ -74,7 +76,7 @@ fn build_ui(synth_state: SynthState, ui: &mut UiState) -> Id {
         let button = Button::new(module).ui(ui);
         ui.add_listener(button, move |_: &mut bool, mut ctx| {
             ctx.poke(patcher, &mut PatcherAction::Module(module.into()));
-        });        
+        });
         buttons.push(button);
     }
     let button_row = padded_flex_row(&buttons, ui);
@@ -128,7 +130,7 @@ fn main() {
     builder.set_handler(Box::new(UiMain::new(state)));
     builder.set_title("Synthesizer IO");
     let window = builder.build().unwrap();
-    let _midi_connection = setup_midi(engine);  // keep from being dropped
+    let _midi_connection = setup_midi(engine); // keep from being dropped
     thread::spawn(move || run_cpal(worker));
     window.show();
     run_loop.run();
@@ -137,11 +139,16 @@ fn main() {
 fn setup_midi(engine: Arc<Mutex<Engine>>) -> Option<MidiInputConnection<()>> {
     let mut midi_in = MidiInput::new("midir input").expect("can't create midi input");
     midi_in.ignore(::midir::Ignore::None);
-    let result = midi_in.connect(0, "in", move |_ts, data, _| {
-        //println!("{}, {:?}", ts, data);
-        let mut engine = engine.lock().unwrap();
-        engine.dispatch_midi(data, time::precise_time_ns());
-    }, ());
+    let result = midi_in.connect(
+        0,
+        "in",
+        move |_ts, data, _| {
+            //println!("{}, {:?}", ts, data);
+            let mut engine = engine.lock().unwrap();
+            engine.dispatch_midi(data, time::precise_time_ns());
+        },
+        (),
+    );
     if let Err(ref e) = result {
         println!("error connecting to midi: {:?}", e);
     }
@@ -151,9 +158,11 @@ fn setup_midi(engine: Arc<Mutex<Engine>>) -> Option<MidiInputConnection<()>> {
 fn run_cpal(mut worker: Worker) {
     let event_loop = EventLoop::new();
     let device = cpal::default_output_device().expect("no output device");
-    let mut supported_formats_range = device.supported_output_formats()
+    let mut supported_formats_range = device
+        .supported_output_formats()
         .expect("error while querying formats");
-    let format = supported_formats_range.next()
+    let format = supported_formats_range
+        .next()
         .expect("no supported format?!")
         .with_max_sample_rate();
     println!("format: {:?}", format);
@@ -162,7 +171,9 @@ fn run_cpal(mut worker: Worker) {
 
     event_loop.run(move |_stream_id, stream_data| {
         match stream_data {
-            StreamData::Output { buffer: UnknownTypeOutputBuffer::F32(mut buf) } => {
+            StreamData::Output {
+                buffer: UnknownTypeOutputBuffer::F32(mut buf),
+            } => {
                 let buf_slice = buf.deref_mut();
                 let mut i = 0;
                 let mut timestamp = time::precise_time_ns();
