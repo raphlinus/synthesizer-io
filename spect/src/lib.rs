@@ -1,11 +1,11 @@
 // Copyright 2018 The Synthesizer IO Authors.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     https://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,11 +17,11 @@
 extern crate rustfft;
 mod colormap;
 
-use std::sync::Arc;
 use std::f32::consts::PI;
+use std::sync::Arc;
 
-use rustfft::{FFT, FFTplanner};
 use rustfft::num_complex::Complex;
+use rustfft::{FFTplanner, FFT};
 
 pub struct Spect {
     window: Vec<f32>,
@@ -37,7 +37,12 @@ impl Spect {
         let window = Self::mk_window(width);
         let ibuf = vec![Default::default(); width];
         let obuf = vec![Default::default(); width];
-        Spect { window, ibuf, obuf, fft }
+        Spect {
+            window,
+            ibuf,
+            obuf,
+            fft,
+        }
     }
 
     pub fn image_dims(&self, n_samples: usize) -> (usize, usize) {
@@ -63,7 +68,11 @@ impl Spect {
 
     // Compute one slice worth of spectrum. On input, `data` is the same size as the window.
     fn compute_one_window(&mut self, data: &[f32]) {
-        for ((i, w), o) in data.iter().zip(self.window.iter()).zip(self.ibuf.iter_mut()) {
+        for ((i, w), o) in data
+            .iter()
+            .zip(self.window.iter())
+            .zip(self.ibuf.iter_mut())
+        {
             *o = (i * w).into();
         }
         self.fft.process(&mut self.ibuf, &mut self.obuf);
@@ -71,7 +80,7 @@ impl Spect {
 
     fn fill_column(&self, img: &mut [u8], x: usize, width: usize) {
         // TODO: make scaling parameters tunable in constructor
-        let max_amp = 40.0;  // dB
+        let max_amp = 40.0; // dB
         let min_amp = max_amp - 120.0;
 
         let y_scale = 255.0 * 10.0 / 10f32.ln() / (max_amp - min_amp);
@@ -94,6 +103,8 @@ impl Spect {
     // Create a Hann window of the specified width.
     fn mk_window(width: usize) -> Vec<f32> {
         let d = 2.0 * PI / (width as f32);
-        (0..width).map(|i| 0.5 - 0.5 * (i as f32 * d).cos()).collect()
+        (0..width)
+            .map(|i| 0.5 - 0.5 * (i as f32 * d).cos())
+            .collect()
     }
 }

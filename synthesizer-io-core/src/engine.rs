@@ -16,11 +16,11 @@
 
 use time;
 
-use id_allocator::IdAllocator;
-use graph::{IntoBoxedSlice, Message, Node, Note, SetParam};
-use module::Module;
-use modules;
-use queue::{Receiver, Sender};
+use crate::graph::{IntoBoxedSlice, Message, Node, Note, SetParam};
+use crate::id_allocator::IdAllocator;
+use crate::module::Module;
+use crate::modules;
+use crate::queue::{Receiver, Sender};
 
 /// The interface from the application to the audio engine.
 ///
@@ -141,7 +141,10 @@ impl Engine {
     /// Set the output bus.
     pub fn set_outputs(&mut self, outputs: &[usize]) {
         let sum_node = match self.midi {
-            Some(Midi { control_map: ControlMap{ ext, .. }, .. }) => ext,
+            Some(Midi {
+                control_map: ControlMap { ext, .. },
+                ..
+            }) => ext,
             _ => 0,
         };
         self.core.update_sum_node(sum_node, outputs);
@@ -153,16 +156,32 @@ impl Core {
         let mut id_alloc = IdAllocator::new();
         id_alloc.reserve(0);
         let monitor_queues = None;
-        Core { sample_rate, rx, tx, id_alloc, monitor_queues }
+        Core {
+            sample_rate,
+            rx,
+            tx,
+            id_alloc,
+            monitor_queues,
+        }
     }
 
-    pub fn create_node<B1: IntoBoxedSlice<(usize, usize)>,
-                       B2: IntoBoxedSlice<(usize, usize)>,
-                       M: Module + 'static>
-        (&mut self, module: M, in_buf_wiring: B1, in_ctrl_wiring: B2) -> usize
-    {
+    pub fn create_node<
+        B1: IntoBoxedSlice<(usize, usize)>,
+        B2: IntoBoxedSlice<(usize, usize)>,
+        M: Module + 'static,
+    >(
+        &mut self,
+        module: M,
+        in_buf_wiring: B1,
+        in_ctrl_wiring: B2,
+    ) -> usize {
         let id = self.id_alloc.alloc();
-        self.send_node(Node::create(Box::new(module), id, in_buf_wiring, in_ctrl_wiring));
+        self.send_node(Node::create(
+            Box::new(module),
+            id,
+            in_buf_wiring,
+            in_ctrl_wiring,
+        ));
         id
     }
 
@@ -172,15 +191,21 @@ impl Core {
         let saw = self.create_node(modules::Saw::new(sample_rate), [], [(note_pitch, 0)]);
         let cutoff = self.create_node(modules::SmoothCtrl::new(880.0f32.log2()), [], []);
         let reso = self.create_node(modules::SmoothCtrl::new(0.5), [], []);
-        let filter_out = self.create_node(modules::Biquad::new(sample_rate),
-            [(saw, 0)], [(cutoff, 0), (reso, 0)]);
+        let filter_out = self.create_node(
+            modules::Biquad::new(sample_rate),
+            [(saw, 0)],
+            [(cutoff, 0), (reso, 0)],
+        );
 
         let attack = self.create_node(modules::SmoothCtrl::new(5.0), [], []);
         let decay = self.create_node(modules::SmoothCtrl::new(5.0), [], []);
         let sustain = self.create_node(modules::SmoothCtrl::new(4.0), [], []);
         let release = self.create_node(modules::SmoothCtrl::new(5.0), [], []);
-        let adsr = self.create_node(modules::Adsr::new(), [],
-            vec![(attack, 0), (decay, 0), (sustain, 0), (release, 0)]);
+        let adsr = self.create_node(
+            modules::Adsr::new(),
+            [],
+            vec![(attack, 0), (decay, 0), (sustain, 0), (release, 0)],
+        );
         let env_out = self.create_node(modules::Gain::new(), [(filter_out, 0)], [(adsr, 0)]);
 
         let ext = self.create_node(modules::Sum::new(), [], []);
@@ -262,10 +287,8 @@ impl Midi {
         }
     }
 
-    fn set_ctrl_const(&mut self, core: &mut Core, value: u8, lo: f32, hi: f32, ix: usize,
-        ts: u64)
-    {
-        let value = lo + value as f32 * (1.0/127.0) * (hi - lo);
+    fn set_ctrl_const(&mut self, core: &mut Core, value: u8, lo: f32, hi: f32, ix: usize, ts: u64) {
+        let value = lo + value as f32 * (1.0 / 127.0) * (hi - lo);
         let param = SetParam {
             ix: ix,
             param_ix: 0,
@@ -275,9 +298,15 @@ impl Midi {
         core.send(Message::SetParam(param));
     }
 
-    fn send_note(&mut self, core: &mut Core, ixs: Vec<usize>, midi_num: f32, velocity: f32,
-        on: bool, ts: u64)
-    {
+    fn send_note(
+        &mut self,
+        core: &mut Core,
+        ixs: Vec<usize>,
+        midi_num: f32,
+        velocity: f32,
+        on: bool,
+        ts: u64,
+    ) {
         let note = Note {
             ixs: ixs.into_boxed_slice(),
             midi_num: midi_num,

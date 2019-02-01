@@ -14,13 +14,12 @@
 
 //! A graph runner that avoids all blocking operations, suitable for realtime threads.
 
+use std::mem;
 use std::ops::DerefMut;
 use std::ptr;
-use std::mem;
 
-use queue::Item;
-use module::{Module, Buffer};
-
+use crate::module::{Buffer, Module};
+use crate::queue::Item;
 
 // maximum number of control inputs
 const MAX_CTRL: usize = 16;
@@ -98,9 +97,9 @@ pub struct SetParam {
 
 /// A struct that represents a note on/off event
 pub struct Note {
-    pub ixs: Box<[usize]>,  // list of node ix's affected by this note
-    pub midi_num: f32,  // 69.0 = A4 (440Hz)
-    pub velocity: f32,  // 1 = minimum, 127 = maximum
+    pub ixs: Box<[usize]>, // list of node ix's affected by this note
+    pub midi_num: f32,     // 69.0 = A4 (440Hz)
+    pub velocity: f32,     // 1 = minimum, 127 = maximum
     pub on: bool,
     pub timestamp: u64,
 }
@@ -110,11 +109,15 @@ pub trait IntoBoxedSlice<T> {
 }
 
 impl<T> IntoBoxedSlice<T> for Vec<T> {
-    fn into_box(self) -> Box<[T]> { self.into_boxed_slice() }
+    fn into_box(self) -> Box<[T]> {
+        self.into_boxed_slice()
+    }
 }
 
 impl<T> IntoBoxedSlice<T> for Box<[T]> {
-    fn into_box(self) -> Box<[T]> { self }
+    fn into_box(self) -> Box<[T]> {
+        self
+    }
 }
 
 impl<'a, T: Clone> IntoBoxedSlice<T> for &'a [T] {
@@ -125,23 +128,31 @@ impl<'a, T: Clone> IntoBoxedSlice<T> for &'a [T] {
 }
 
 impl<T> IntoBoxedSlice<T> for [T; 0] {
-    fn into_box(self) -> Box<[T]> { Vec::new().into_boxed_slice() }
+    fn into_box(self) -> Box<[T]> {
+        Vec::new().into_boxed_slice()
+    }
 }
 
 impl<T: Clone> IntoBoxedSlice<T> for [T; 1] {
-    fn into_box(self) -> Box<[T]> { self[..].into_box() }
+    fn into_box(self) -> Box<[T]> {
+        self[..].into_box()
+    }
 }
 
 impl<T: Clone> IntoBoxedSlice<T> for [T; 2] {
-    fn into_box(self) -> Box<[T]> { self[..].into_box() }
+    fn into_box(self) -> Box<[T]> {
+        self[..].into_box()
+    }
 }
 
 impl Node {
     /// Create a new node. The index must be given, as well as the input wiring.
-    pub fn create<B1: IntoBoxedSlice<(usize, usize)>,
-                  B2: IntoBoxedSlice<(usize, usize)>>
-        (module: Box<Module>, ix: usize, in_buf_wiring: B1, in_ctrl_wiring: B2) -> Node
-    {
+    pub fn create<B1: IntoBoxedSlice<(usize, usize)>, B2: IntoBoxedSlice<(usize, usize)>>(
+        module: Box<Module>,
+        ix: usize,
+        in_buf_wiring: B1,
+        in_ctrl_wiring: B2,
+    ) -> Node {
         let n_bufs = module.n_bufs_out();
         let mut out_bufs = Vec::with_capacity(n_bufs);
         for _ in 0..n_bufs {
@@ -185,10 +196,12 @@ impl Graph {
     }
 
     fn get_node_mut(&mut self, ix: usize) -> Option<&mut Node> {
-        self.nodes[ix].as_mut().and_then(|msg| match *msg.deref_mut() {
-            Message::Node(ref mut n) => Some(n),
-            _ => None
-        })
+        self.nodes[ix]
+            .as_mut()
+            .and_then(|msg| match *msg.deref_mut() {
+                Message::Node(ref mut n) => Some(n),
+                _ => None,
+            })
     }
 
     pub fn get_module_mut(&mut self, ix: usize) -> &mut Module {
@@ -201,15 +214,22 @@ impl Graph {
         let mut old_item = mem::replace(&mut self.nodes[ix], item);
         if let Some(ref mut old) = old_item {
             if let Message::Node(ref mut old_node) = *old.deref_mut() {
-                self.get_node_mut(ix).unwrap().module.migrate(old_node.module.deref_mut());
+                self.get_node_mut(ix)
+                    .unwrap()
+                    .module
+                    .migrate(old_node.module.deref_mut());
             }
         }
         old_item
     }
 
-    fn run_one_module(&mut self, module_ix: usize, ctrl: &mut [f32; MAX_CTRL],
-        bufs: &mut [*const Buffer; MAX_BUF], timestamp: u64)
-    {
+    fn run_one_module(
+        &mut self,
+        module_ix: usize,
+        ctrl: &mut [f32; MAX_CTRL],
+        bufs: &mut [*const Buffer; MAX_BUF],
+        timestamp: u64,
+    ) {
         {
             let this = self.get_node(module_ix).unwrap();
             for (i, &(mod_ix, buf_ix)) in this.in_buf_wiring.iter().enumerate() {
@@ -224,8 +244,13 @@ impl Graph {
         let this = self.get_node_mut(module_ix).unwrap();
         let buf_in = unsafe { mem::transmute(&bufs[..this.in_buf_wiring.len()]) };
         let ctrl_in = &ctrl[..this.in_ctrl_wiring.len()];
-        this.module.process_ts(ctrl_in, &mut this.out_ctrl, buf_in, &mut this.out_bufs,
-            timestamp);
+        this.module.process_ts(
+            ctrl_in,
+            &mut this.out_ctrl,
+            buf_in,
+            &mut this.out_bufs,
+            timestamp,
+        );
     }
 
     fn topo_sort(&mut self, root: usize) -> usize {
@@ -241,7 +266,10 @@ impl Graph {
         while stack != SENTINEL {
             if self.visited[stack] == Pushed {
                 self.visited[stack] = Scanned;
-                let node = self.nodes[stack].as_ref().and_then(|item| item.get_node()).unwrap();
+                let node = self.nodes[stack]
+                    .as_ref()
+                    .and_then(|item| item.get_node())
+                    .unwrap();
                 for &(ix, _) in node.in_buf_wiring.iter().chain(node.in_ctrl_wiring.iter()) {
                     if self.visited[ix] == NotVisited {
                         self.visited[ix] = Pushed;
@@ -282,7 +310,7 @@ impl Graph {
         let mut ix = self.topo_sort(root);
         while ix != SENTINEL {
             self.run_one_module(ix, &mut ctrl, &mut bufs, timestamp);
-            self.visited[ix] = NotVisited;  // reset state for next topo sort
+            self.visited[ix] = NotVisited; // reset state for next topo sort
             ix = self.link[ix];
         }
     }

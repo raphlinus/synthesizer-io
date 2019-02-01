@@ -14,7 +14,7 @@
 
 //! A simple module that just holds a note at a constant pitch.
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 pub struct NotePitch {
     value: f32,
@@ -27,7 +27,9 @@ impl NotePitch {
 }
 
 impl Module for NotePitch {
-    fn n_ctrl_out(&self) -> usize { 1 }
+    fn n_ctrl_out(&self) -> usize {
+        1
+    }
 
     fn handle_note(&mut self, midi_num: f32, _velocity: f32, on: bool) {
         if on {
@@ -35,9 +37,13 @@ impl Module for NotePitch {
         }
     }
 
-    fn process(&mut self, _control_in: &[f32], control_out: &mut [f32],
-        _buf_in: &[&Buffer], _buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        _control_in: &[f32],
+        control_out: &mut [f32],
+        _buf_in: &[&Buffer],
+        _buf_out: &mut [Buffer],
+    ) {
         control_out[0] = self.value;
     }
 }

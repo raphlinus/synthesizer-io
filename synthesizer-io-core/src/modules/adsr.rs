@@ -14,7 +14,7 @@
 
 //! Attack, decay, sustain, release.
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 pub struct Adsr {
     value: f32,
@@ -24,9 +24,9 @@ pub struct Adsr {
 enum State {
     Quiet,
     Attack,  // note is on, rising
-    Decay,  // note is on, falling
-    Sustain,  // note is on, steady
-    Release,  // note is off, falling
+    Decay,   // note is on, falling
+    Sustain, // note is on, steady
+    Release, // note is off, falling
 }
 
 use self::State::*;
@@ -41,7 +41,9 @@ impl Adsr {
 }
 
 impl Module for Adsr {
-    fn n_ctrl_out(&self) -> usize { 1 }
+    fn n_ctrl_out(&self) -> usize {
+        1
+    }
 
     fn handle_note(&mut self, _midi_num: f32, _velocity: f32, on: bool) {
         if on {
@@ -51,9 +53,13 @@ impl Module for Adsr {
         }
     }
 
-    fn process(&mut self, control_in: &[f32], control_out: &mut [f32],
-        _buf_in: &[&Buffer], _buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        control_in: &[f32],
+        control_out: &mut [f32],
+        _buf_in: &[&Buffer],
+        _buf_out: &mut [Buffer],
+    ) {
         match self.state {
             Quiet => (),
             Attack => {

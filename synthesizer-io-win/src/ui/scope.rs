@@ -16,16 +16,12 @@
 
 use std::any::Any;
 
-use direct2d::enums::BitmapInterpolationMode;
-use direct2d::image::Bitmap;
-use direct2d::math::SizeU;
-use direct2d::RenderTarget;
-use dxgi::Format;
-use winapi::um::dcommon::D2D_SIZE_U;
-use winapi::shared::basetsd::UINT32;
+use kurbo::Rect;
+
+use piet::{ImageFormat, InterpolationMode, RenderContext};
 
 use druid::{BoxConstraints, HandlerCtx, LayoutCtx, LayoutResult};
-use druid::{Id, Geometry, PaintCtx, Ui, Widget};
+use druid::{Geometry, Id, PaintCtx, Ui, Widget};
 
 use synthesize_scope as s;
 
@@ -43,35 +39,34 @@ pub enum ScopeCommand {
 
 impl Widget for Scope {
     fn paint(&mut self, paint_ctx: &mut PaintCtx, geom: &Geometry) {
-        let rt = paint_ctx.render_target();
+        let rc = &mut *paint_ctx.render_ctx;
         let w = 640;
         let h = 480;
         let data = self.s.as_rgba();
-        let b = Bitmap::create(rt)
-            .with_raw_data(
-                SizeU(D2D_SIZE_U {
-                    width: w as UINT32, height: h as UINT32
-                }),
-                &data,
-                w as UINT32 * 4)
-            .with_format(Format::R8G8B8A8Unorm)
-            .build().expect("error creating bitmap");
+        let b = rc.make_image(w, h, &data, ImageFormat::RgbaPremul).unwrap();
         let height = geom.size.1.min(0.75 * geom.size.0);
         let width = height * (1.0 / 0.75);
         let x0 = geom.pos.0;
         let y0 = geom.pos.1;
-        rt.draw_bitmap(
+        rc.draw_image(
             &b,
-            (x0 + geom.size.0 - width, y0, x0 + geom.size.0, y0 + height),
-            1.0,
-            BitmapInterpolationMode::Linear,
-            (0.0, 0.0, w as f32, h as f32),
+            Rect::new(
+                (x0 + geom.size.0 - width) as f64,
+                y0 as f64,
+                (x0 + geom.size.0) as f64,
+                (y0 + height) as f64,
+            ),
+            InterpolationMode::Bilinear,
         );
     }
 
-    fn layout(&mut self, bc: &BoxConstraints, _children: &[Id], _size: Option<(f32, f32)>,
-        _ctx: &mut LayoutCtx) -> LayoutResult
-    {
+    fn layout(
+        &mut self,
+        bc: &BoxConstraints,
+        _children: &[Id],
+        _size: Option<(f32, f32)>,
+        _ctx: &mut LayoutCtx,
+    ) -> LayoutResult {
         let size = bc.constrain((100.0, 100.0));
         //self.size = size;
         LayoutResult::Size(size)
@@ -120,6 +115,5 @@ impl Scope {
             }
             xylast = Some((x, y));
         }
-
     }
 }

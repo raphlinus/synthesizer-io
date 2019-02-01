@@ -41,17 +41,21 @@ impl Buffer {
 impl Default for Buffer {
     fn default() -> Buffer {
         Buffer {
-            buf: [0.0; N_SAMPLES_PER_CHUNK]
+            buf: [0.0; N_SAMPLES_PER_CHUNK],
         }
     }
 }
 
 pub trait Module: ToAny + Send {
     /// Report the number of buffers this module is expected to generate.
-    fn n_bufs_out(&self) -> usize { 0 }
+    fn n_bufs_out(&self) -> usize {
+        0
+    }
 
     /// Report the number of control values this module is expected to generate.
-    fn n_ctrl_out(&self) -> usize { 0 }
+    fn n_ctrl_out(&self) -> usize {
+        0
+    }
 
     /// Give modules an opportunity to migrate state from the previous module
     /// when it is replaced.
@@ -59,16 +63,26 @@ pub trait Module: ToAny + Send {
     fn migrate(&mut self, old: &mut Module) {}
 
     /// Process one chunk of audio. Implementations are expected to be lock-free.
-    fn process(&mut self, control_in: &[f32], control_out: &mut [f32],
-        buf_in: &[&Buffer], buf_out: &mut [Buffer]);
+    fn process(
+        &mut self,
+        control_in: &[f32],
+        control_out: &mut [f32],
+        buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+    );
 
     /// Process one chunk of audio. Implementations are expected to be lock-free.
     /// Implementations should override this method if they require a timestamp,
     /// otherwise `process`.
     #[allow(unused)]
-    fn process_ts(&mut self, control_in: &[f32], control_out: &mut [f32],
-        buf_in: &[&Buffer], buf_out: &mut [Buffer], timestamp: u64)
-    {
+    fn process_ts(
+        &mut self,
+        control_in: &[f32],
+        control_out: &mut [f32],
+        buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+        timestamp: u64,
+    ) {
         self.process(control_in, control_out, buf_in, buf_out);
     }
 
@@ -86,5 +100,7 @@ pub trait ToAny {
 }
 
 impl<T: Sized + 'static> ToAny for T {
-    fn to_any(&mut self) -> &mut Any { self }
+    fn to_any(&mut self) -> &mut Any {
+        self
+    }
 }

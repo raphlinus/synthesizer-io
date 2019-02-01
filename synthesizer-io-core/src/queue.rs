@@ -14,14 +14,14 @@
 
 //! A lock-free queue suitable for real-time audio threads.
 
-use std::sync::atomic::{AtomicPtr, Ordering};
-use std::sync::atomic::Ordering::{Relaxed, Release};
-use std::sync::Arc;
-use std::thread;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::ptr;
 use std::ptr::NonNull;
-use std::ops::{Deref, DerefMut};
-use std::marker::PhantomData;
+use std::sync::atomic::Ordering::{Relaxed, Release};
+use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::Arc;
+use std::thread;
 use std::time;
 
 // The implementation is a fairly straightforward Treiber stack.
@@ -67,7 +67,9 @@ impl<T> Item<T> {
         }));
         // TODO: use Box::into_raw_non_null when it stabilizes
         unsafe {
-            Item { ptr: NonNull::new_unchecked(ptr) }
+            Item {
+                ptr: NonNull::new_unchecked(ptr),
+            }
         }
     }
 }
@@ -175,14 +177,16 @@ impl<T: Send + 'static> Queue<T> {
         let queue = Arc::new(Queue {
             head: AtomicPtr::new(ptr::null_mut()),
         });
-        (Sender {
-            queue: queue.clone(),
-            _marker: Default::default(),
-        },
-        Receiver {
-            queue: queue,
-            _marker: Default::default(),
-        })
+        (
+            Sender {
+                queue: queue.clone(),
+                _marker: Default::default(),
+            },
+            Receiver {
+                queue: queue,
+                _marker: Default::default(),
+            },
+        )
     }
 
     fn send(&self, payload: T) {
@@ -204,8 +208,13 @@ impl<T: Send + 'static> Queue<T> {
     fn push_raw(&self, mut n: NonNull<Node<T>>) {
         let mut old_ptr = self.head.load(Relaxed);
         loop {
-            unsafe { n.as_mut().child = NonNull::new(old_ptr); }
-            match self.head.compare_exchange_weak(old_ptr, n.as_ptr(), Release, Relaxed) {
+            unsafe {
+                n.as_mut().child = NonNull::new(old_ptr);
+            }
+            match self
+                .head
+                .compare_exchange_weak(old_ptr, n.as_ptr(), Release, Relaxed)
+            {
                 Ok(_) => break,
                 Err(old) => old_ptr = old,
             }

@@ -14,26 +14,26 @@
 
 //! A collection of audio processing modules.
 
-mod sum;
-mod buzz;
-mod sin;
-mod saw;
-mod biquad;
-mod const_ctrl;
-mod smooth_ctrl;
-mod note_pitch;
 mod adsr;
+mod biquad;
+mod buzz;
+mod const_ctrl;
 mod gain;
 mod monitor;
+mod note_pitch;
+mod saw;
+mod sin;
+mod smooth_ctrl;
+mod sum;
 
-pub use self::sum::Sum;
-pub use self::buzz::Buzz;
-pub use self::sin::Sin;
-pub use self::saw::Saw;
-pub use self::biquad::Biquad;
-pub use self::const_ctrl::ConstCtrl;
-pub use self::smooth_ctrl::SmoothCtrl;
-pub use self::note_pitch::NotePitch;
 pub use self::adsr::Adsr;
+pub use self::biquad::Biquad;
+pub use self::buzz::Buzz;
+pub use self::const_ctrl::ConstCtrl;
 pub use self::gain::Gain;
 pub use self::monitor::Monitor;
+pub use self::note_pitch::NotePitch;
+pub use self::saw::Saw;
+pub use self::sin::Sin;
+pub use self::smooth_ctrl::SmoothCtrl;
+pub use self::sum::Sum;

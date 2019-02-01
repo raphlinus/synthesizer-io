@@ -16,24 +16,22 @@
 
 #![feature(test)]
 
-extern crate test;
 extern crate synthesizer_io_core;
+extern crate test;
 
 #[cfg(test)]
 mod bench {
-    use test::Bencher;
-    use synthesizer_io_core::module::{Module, Buffer};
-    use synthesizer_io_core::modules::Sin;
+    use synthesizer_io_core::module::{Buffer, Module};
     use synthesizer_io_core::modules::Biquad;
+    use synthesizer_io_core::modules::Sin;
+    use test::Bencher;
 
     #[bench]
     fn sin(b: &mut Bencher) {
         let mut buf = [Buffer::default(); 1];
         let freq = [440.0f32.log2()];
         let mut sin = Sin::new(44_100.0);
-        b.iter(||
-            sin.process(&freq[..], &mut[][..], &[][..], &mut buf[..])
-        )
+        b.iter(|| sin.process(&freq[..], &mut [][..], &[][..], &mut buf[..]))
     }
 
     #[bench]
@@ -43,9 +41,7 @@ mod bench {
         let mut bufo = [Buffer::default(); 1];
         let mut biquad = Biquad::new(44_100.0);
         let params = [44.0f32.log2(), 0.293];
-        b.iter(||
-            biquad.process(&params[..], &mut [][..], &bufs[..], &mut bufo[..])
-        )
+        b.iter(|| biquad.process(&params[..], &mut [][..], &bufs[..], &mut bufo[..]))
     }
 
     #[bench]
@@ -62,7 +58,7 @@ mod bench {
         let outb = bufo.get_mut();
         let mut z1 = 0.0f32;
         let mut z2 = 0.0f32;
-        b.iter(||
+        b.iter(|| {
             for i in 0..outb.len() {
                 let inp = inb[i];
                 let out = inp * a0 + z1;
@@ -70,7 +66,7 @@ mod bench {
                 z2 = inp * a2 - b2 * out;
                 outb[i] = out;
             }
-        )
+        })
     }
 
     #[bench]

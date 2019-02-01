@@ -3,6 +3,7 @@ name = "synthesizer-io"
 version = "0.1.0"
 license = "Apache-2.0"
 authors = ["Raph Levien <raph@google.com>"]
+edition = "2018"
 
 [dependencies]
 time = "0.1"

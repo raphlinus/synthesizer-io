@@ -15,7 +15,7 @@
 //! A simple module that applies gain to the input. Gain is interpreted
 //! as log2 of absolute gain. Linear smoothing applied.
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 pub struct Gain {
     last_g: f32,
@@ -23,18 +23,22 @@ pub struct Gain {
 
 impl Gain {
     pub fn new() -> Gain {
-        Gain {
-            last_g: 0.0,
-        }
+        Gain { last_g: 0.0 }
     }
 }
 
 impl Module for Gain {
-    fn n_bufs_out(&self) -> usize { 1 }
+    fn n_bufs_out(&self) -> usize {
+        1
+    }
 
-    fn process(&mut self, control_in: &[f32], _control_out: &mut [f32],
-        buf_in: &[&Buffer], buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        control_in: &[f32],
+        _control_out: &mut [f32],
+        buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+    ) {
         let ctrl = control_in[0];
         let g = ctrl.exp2();
         let out = buf_out[0].get_mut();

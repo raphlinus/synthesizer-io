@@ -14,10 +14,9 @@
 
 //! An implementation of biquad filters.
 
-
 use std::f32::consts;
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 pub struct Biquad {
     sr_offset: f32,
@@ -36,7 +35,7 @@ impl Biquad {
 }
 
 struct StateParams {
-    a: [f32; 4],  // 2x2 matrix, column-major order
+    a: [f32; 4], // 2x2 matrix, column-major order
     b: [f32; 2],
     c: [f32; 2],
     d: f32,
@@ -46,7 +45,7 @@ struct StateParams {
 // -1.0 is the Nyquist frequency.
 fn calc_g(log_f: f32) -> f32 {
     // TODO: use lut to speed this up
-    let f = log_f.exp2();  // pi has already been factored into sr_offset
+    let f = log_f.exp2(); // pi has already been factored into sr_offset
     f.tan()
 }
 
@@ -62,31 +61,49 @@ fn svf_lp(log_f: f32, res: f32) -> StateParams {
     let b = [a2, a3];
     let c = [0.5 * a2, 1.0 - 0.5 * a3];
     let d = 0.5 * a3;
-    StateParams { a: a, b: b, c: c, d: d }
+    StateParams {
+        a: a,
+        b: b,
+        c: c,
+        d: d,
+    }
 }
 
 // See https://github.com/google/music-synthesizer-for-android/blob/master/lab/Second%20order%20sections%20in%20matrix%20form.ipynb
 fn raise_matrix(params: StateParams) -> [f32; 16] {
     let StateParams { a, b, c, d } = params;
-    [d, c[0] * b[0] + c[1] * b[1],
-     a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
-
-     0.0, d, b[0], b[1],
-
-     c[0], c[0] * a[0] + c[1] * a[1],
-     a[0] * a[0] + a[2] * a[1], a[1] * a[0] + a[3] * a[1],
-
-     c[1], c[0] * a[2] + c[1] * a[3],
-     a[0] * a[2] + a[2] * a[3], a[1] * a[2] + a[3] * a[3],
+    [
+        d,
+        c[0] * b[0] + c[1] * b[1],
+        a[0] * b[0] + a[2] * b[1],
+        a[1] * b[0] + a[3] * b[1],
+        0.0,
+        d,
+        b[0],
+        b[1],
+        c[0],
+        c[0] * a[0] + c[1] * a[1],
+        a[0] * a[0] + a[2] * a[1],
+        a[1] * a[0] + a[3] * a[1],
+        c[1],
+        c[0] * a[2] + c[1] * a[3],
+        a[0] * a[2] + a[2] * a[3],
+        a[1] * a[2] + a[3] * a[3],
     ]
 }
 
 impl Module for Biquad {
-    fn n_bufs_out(&self) -> usize { 1 }
+    fn n_bufs_out(&self) -> usize {
+        1
+    }
 
-    fn process(&mut self, control_in: &[f32], _control_out: &mut [f32],
-        buf_in: &[&Buffer], buf_out: &mut [Buffer])
-    {
+    fn process(
+        &mut self,
+        control_in: &[f32],
+        _control_out: &mut [f32],
+        buf_in: &[&Buffer],
+        buf_out: &mut [Buffer],
+    ) {
         let log_f = control_in[0];
         let res = control_in[1];
         // TODO: maybe avoid recomputing matrix if params haven't changed

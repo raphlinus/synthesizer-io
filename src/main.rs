@@ -27,9 +27,9 @@ extern crate time;
 extern crate synthesizer_io_core;
 
 #[cfg(target_os = "macos")]
-use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat, Scope};
-#[cfg(target_os = "macos")]
 use coreaudio::audio_unit::render_callback::{self, data};
+#[cfg(target_os = "macos")]
+use coreaudio::audio_unit::{AudioUnit, IOType, SampleFormat, Scope};
 
 #[cfg(not(target_os = "macos"))]
 use cpal::{EventLoop, StreamData, UnknownTypeOutputBuffer};
@@ -41,10 +41,10 @@ use std::ops::DerefMut;
 
 use synthesizer_io_core::modules;
 
-use synthesizer_io_core::worker::Worker;
-use synthesizer_io_core::queue::Sender;
-use synthesizer_io_core::graph::{Node, Message, SetParam, Note};
+use synthesizer_io_core::graph::{Message, Node, Note, SetParam};
 use synthesizer_io_core::module::N_SAMPLES_PER_CHUNK;
+use synthesizer_io_core::queue::Sender;
+use synthesizer_io_core::worker::Worker;
 
 struct Midi {
     tx: Sender<Message>,
@@ -64,7 +64,7 @@ impl Midi {
     }
 
     fn set_ctrl_const(&mut self, value: u8, lo: f32, hi: f32, ix: usize, ts: u64) {
-        let value = lo + value as f32 * (1.0/127.0) * (hi - lo);
+        let value = lo + value as f32 * (1.0 / 127.0) * (hi - lo);
         let param = SetParam {
             ix: ix,
             param_ix: 0,
@@ -74,9 +74,7 @@ impl Midi {
         self.send(Message::SetParam(param));
     }
 
-    fn send_note(&mut self, ixs: Vec<usize>, midi_num: f32, velocity: f32, on: bool,
-        ts: u64)
-    {
+    fn send_note(&mut self, ixs: Vec<usize>, midi_num: f32, velocity: f32, on: bool, ts: u64) {
         let note = Note {
             ixs: ixs.into_boxed_slice(),
             midi_num: midi_num,
@@ -122,7 +120,7 @@ impl Midi {
 }
 
 fn main() {
-    let (mut worker, tx, rx) = Worker::create(1024);
+    let (mut worker, tx, _rx) = Worker::create(1024);
 
     /*
     let module = Box::new(modules::ConstCtrl::new(440.0f32.log2()));
@@ -146,9 +144,14 @@ fn main() {
     let module = Box::new(modules::NotePitch::new());
     worker.handle_node(Node::create(module, 5, [], []));
     let module = Box::new(modules::Biquad::new(44_100.0));
-    worker.handle_node(Node::create(module, 6, [(1,0)], [(3, 0), (4, 0)]));
+    worker.handle_node(Node::create(module, 6, [(1, 0)], [(3, 0), (4, 0)]));
     let module = Box::new(modules::Adsr::new());
-    worker.handle_node(Node::create(module, 7, [], vec![(11, 0), (12, 0), (13, 0), (14, 0)]));
+    worker.handle_node(Node::create(
+        module,
+        7,
+        [],
+        vec![(11, 0), (12, 0), (13, 0), (14, 0)],
+    ));
     let module = Box::new(modules::Gain::new());
     worker.handle_node(Node::create(module, 0, [(6, 0)], [(7, 0)]));
 
@@ -172,9 +175,11 @@ fn main() {
 fn run_cpal(mut worker: Worker, tx: Sender<Message>) {
     let event_loop = EventLoop::new();
     let device = cpal::default_output_device().expect("no output device");
-    let mut supported_formats_range = device.supported_output_formats()
+    let mut supported_formats_range = device
+        .supported_output_formats()
         .expect("error while querying formats");
-    let format = supported_formats_range.next()
+    let format = supported_formats_range
+        .next()
         .expect("no supported format?!")
         .with_max_sample_rate();
     println!("format: {:?}", format);
@@ -186,17 +191,24 @@ fn run_cpal(mut worker: Worker, tx: Sender<Message>) {
 
     let mut midi_in = MidiInput::new("midir input").expect("can't create midi input");
     midi_in.ignore(::midir::Ignore::None);
-    let result =  midi_in.connect(0, "in", move |ts, data, _| {
-        //println!("{}, {:?}", ts, data);
-        midi.dispatch_midi(data, ts);
-    }, ());
+    let result = midi_in.connect(
+        0,
+        "in",
+        move |ts, data, _| {
+            //println!("{}, {:?}", ts, data);
+            midi.dispatch_midi(data, ts);
+        },
+        (),
+    );
     if let Err(e) = result {
         println!("error connecting to midi: {:?}", e);
     }
 
     event_loop.run(move |_stream_id, stream_data| {
         match stream_data {
-            StreamData::Output { buffer: UnknownTypeOutputBuffer::F32(mut buf) } => {
+            StreamData::Output {
+                buffer: UnknownTypeOutputBuffer::F32(mut buf),
+            } => {
                 let mut buf_slice = buf.deref_mut();
                 let mut i = 0;
                 let mut timestamp = time::precise_time_ns();
@@ -234,8 +246,13 @@ fn run_mac(worker: Worker, tx: Sender<Message>) {
                 let data = packet.data();
                 let delta_t = packet.timestamp() - last_ts;
                 let speed = 1e9 * (data[2] as f64 - last_val as f64) / delta_t as f64;
-                println!("{} {:3.3} {} {}", speed, delta_t as f64 * 1e-6, data[2],
-                    time::precise_time_ns() - packet.timestamp());
+                println!(
+                    "{} {:3.3} {} {}",
+                    speed,
+                    delta_t as f64 * 1e-6,
+                    data[2],
+                    time::precise_time_ns() - packet.timestamp()
+                );
                 last_val = data[2];
                 last_ts = packet.timestamp();
                 midi.dispatch_midi(&data, last_ts);
@@ -250,12 +267,11 @@ fn run_mac(worker: Worker, tx: Sender<Message>) {
         input_port.disconnect_source(&source).unwrap();
     } else {
         println!("No midi available");
-    }    
+    }
 }
 
 #[cfg(target_os = "macos")]
 fn run_audio_unit(mut worker: Worker) -> Result<AudioUnit, coreaudio::Error> {
-
     // Construct an Output audio unit that delivers audio to the default output device.
     let mut audio_unit = AudioUnit::new(IOType::DefaultOutput)?;
 
@@ -267,7 +283,11 @@ fn run_audio_unit(mut worker: Worker) -> Result<AudioUnit, coreaudio::Error> {
 
     type Args = render_callback::Args<data::NonInterleaved<f32>>;
     audio_unit.set_render_callback(move |args| {
-        let Args { num_frames, mut data, .. }: Args = args;
+        let Args {
+            num_frames,
+            mut data,
+            ..
+        }: Args = args;
         assert!(num_frames % N_SAMPLES_PER_CHUNK == 0);
         let mut i = 0;
         let mut timestamp = time::precise_time_ns();

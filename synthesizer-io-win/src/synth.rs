@@ -24,7 +24,7 @@ use druid::{HandlerCtx, Id, Ui, Widget};
 
 use synthesizer_io_core::engine::{Engine, ModuleType, NoteEvent};
 
-use grid::{Delta, ModuleGrid, ModuleInstance, WireDelta, WireGrid};
+use crate::grid::{Delta, ModuleGrid, ModuleInstance, WireDelta, WireGrid};
 
 /// Synthesizer engine state.
 ///
@@ -126,7 +126,7 @@ impl SynthState {
         let module_type = match inst.spec.name.as_str() {
             "sin" => ModuleType::Sin,
             "saw" => ModuleType::Saw,
-            _ => ModuleType::Sin,  // just to do something
+            _ => ModuleType::Sin, // just to do something
         };
         let ll_id = engine.instantiate_module(0, module_type);
         self.outputs.insert(output_pin_coords, ll_id);
@@ -135,8 +135,10 @@ impl SynthState {
     // Return uf node.
     fn find_node(&mut self, coords: (u16, u16)) -> usize {
         let uf = &mut self.uf;
-        *self.coord_to_node.entry(coords).or_insert_with(||
-            uf.insert(Default::default()))
+        *self
+            .coord_to_node
+            .entry(coords)
+            .or_insert_with(|| uf.insert(Default::default()))
     }
 
     fn update_wiring(&mut self) {

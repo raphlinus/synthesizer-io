@@ -14,16 +14,16 @@
 
 //! A module that smooths parameters (optimized for midi controllers).
 
-use module::{Module, Buffer};
+use crate::module::{Buffer, Module};
 
 pub struct SmoothCtrl {
-    rate: f32,  // smoothed rate (units of updates per ms)
-    rategoal: f32,  // unsmoothed rate
-    t: u64,  // timestamp of current time
-    last_set_t: u64,  // timestamp of last param setting
-    inp: f32,  // raw, unsmoothed value
-    mid: f32,  // result of 1 pole of lowpass filtering
-    out: f32,  // result of 2 poles of lowpass filtering
+    rate: f32,       // smoothed rate (units of updates per ms)
+    rategoal: f32,   // unsmoothed rate
+    t: u64,          // timestamp of current time
+    last_set_t: u64, // timestamp of last param setting
+    inp: f32,        // raw, unsmoothed value
+    mid: f32,        // result of 1 pole of lowpass filtering
+    out: f32,        // result of 2 poles of lowpass filtering
 }
 
 impl SmoothCtrl {
@@ -41,17 +41,28 @@ impl SmoothCtrl {
 }
 
 impl Module for SmoothCtrl {
-    fn n_ctrl_out(&self) -> usize { 1 }
-
-    // maybe empty impl belongs in Module?
-    fn process(&mut self, _control_in: &[f32], _control_out: &mut [f32],
-        _buf_in: &[&Buffer], _buf_out: &mut [Buffer])
-    {
+    fn n_ctrl_out(&self) -> usize {
+        1
     }
 
-    fn process_ts(&mut self, _control_in: &[f32], control_out: &mut [f32],
-        _buf_in: &[&Buffer], _buf_out: &mut [Buffer], timestamp: u64)
-    {
+    // maybe empty impl belongs in Module?
+    fn process(
+        &mut self,
+        _control_in: &[f32],
+        _control_out: &mut [f32],
+        _buf_in: &[&Buffer],
+        _buf_out: &mut [Buffer],
+    ) {
+    }
+
+    fn process_ts(
+        &mut self,
+        _control_in: &[f32],
+        control_out: &mut [f32],
+        _buf_in: &[&Buffer],
+        _buf_out: &mut [Buffer],
+        timestamp: u64,
+    ) {
         self.advance_to(timestamp);
         control_out[0] = self.out;
     }
@@ -59,7 +70,7 @@ impl Module for SmoothCtrl {
     fn set_param(&mut self, _param_ix: usize, val: f32, timestamp: u64) {
         self.advance_to(timestamp);
         if timestamp > self.last_set_t {
-            const SLOWEST_RATE: f32 = 0.005;  // 0.2s
+            const SLOWEST_RATE: f32 = 0.005; // 0.2s
             let mut rategoal = 1e6 / ((timestamp - self.last_set_t) as f32);
             if rategoal <= SLOWEST_RATE {
                 rategoal = SLOWEST_RATE;
@@ -77,8 +88,8 @@ impl SmoothCtrl {
         if t <= self.t {
             return;
         }
-        let dt = (t - self.t) as f32 * 1e-6;  // in ms
-        const RATE_TC: f32 = 10.0;  // in ms
+        let dt = (t - self.t) as f32 * 1e-6; // in ms
+        const RATE_TC: f32 = 10.0; // in ms
         let erate = ((-1.0 / RATE_TC) * dt).exp();
         let warped_dt = dt * self.rategoal + RATE_TC * (self.rate - self.rategoal) * (1.0 - erate);
         self.rate = self.rategoal + (self.rate - self.rategoal) * erate;
