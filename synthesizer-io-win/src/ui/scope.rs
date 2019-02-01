@@ -39,7 +39,7 @@ pub enum ScopeCommand {
 
 impl Widget for Scope {
     fn paint(&mut self, paint_ctx: &mut PaintCtx, geom: &Geometry) {
-        let rc = &mut paint_ctx.render_ctx;
+        let rc = &mut *paint_ctx.render_ctx;
         let w = 640;
         let h = 480;
         let data = self.s.as_rgba();

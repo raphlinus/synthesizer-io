@@ -59,7 +59,7 @@ const INSET: f32 = 2.0;
 
 impl Widget for Piano {
     fn paint(&mut self, paint_ctx: &mut PaintCtx, geom: &Geometry) {
-        let rc = &mut paint_ctx.render_ctx;
+        let rc = &mut *paint_ctx.render_ctx;
         let black = rc.solid_brush(0x080800ff).unwrap();
         let white = rc.solid_brush(0xf0f0eaff).unwrap();
         let active = rc.solid_brush(0x107010ff).unwrap();

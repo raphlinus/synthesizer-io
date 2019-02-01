@@ -26,8 +26,6 @@ use piet::{
 };
 use piet_common::Piet;
 
-use druid_win_shell::util::default_text_options;
-
 use druid::widget::MouseButton;
 use druid::{BoxConstraints, Geometry, LayoutResult, Ui};
 use druid::{HandlerCtx, Id, LayoutCtx, PaintCtx};
@@ -133,7 +131,7 @@ impl Widget for Patcher {
         // TODO: retain these resources where possible
         let mut resources = PaintResources::create(paint_ctx);
         self.populate_text(&mut resources, paint_ctx.render_ctx);
-        let rt = &mut paint_ctx.render_ctx;
+        let rt = &mut *paint_ctx.render_ctx;
         self.paint_wiregrid(rt, &resources, geom);
         self.paint_modules(rt, &resources, geom);
         self.paint_jumpers(rt, &resources, geom);
@@ -170,6 +168,7 @@ impl Widget for Patcher {
             }
             return true;
         }
+        println!("event: {} {} {}", event.x, event.y, event.count);
         match self.mode {
             PatcherMode::Wire => {
                 if event.count > 0 {
