@@ -14,7 +14,6 @@
 
 //! The WebAssembly bindings for the synthesizer core.
 
-#![feature(proc_macro, wasm_import_module, wasm_custom_section)]
 extern crate wasm_bindgen;
 extern crate synthesizer_io_core;
 use wasm_bindgen::prelude::*;
