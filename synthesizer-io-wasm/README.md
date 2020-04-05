@@ -1,8 +1,21 @@
-Generally following [wasm-bindgen tutorial](https://rustwasm.github.io/wasm-bindgen/basic-usage.html).
+# WASM Example
+
+## Prequisites
+
+- [Node.js](https://nodejs.org/en/) 
+
+(I would recommend LTS but not sure what the minimum version number required to support this project might be)
+
+## Running
+
+> **NOTE** Make sure you turn your audio down before starting because it's quite loud!
 
 ```
-cargo build --target=wasm32-unknown-unknown --release
-wasm-bindgen target/wasm32-unknown-unknown/release/synthesizer_io_wasm.wasm --out-dir .
+# install dependencies
 npm install
-npm run serve
+
+# start a webpack dev server and host the project on http://127.0.0.1:8080
+# NOTE: webpack will build the rust code as well
+npm serve
 ```
+

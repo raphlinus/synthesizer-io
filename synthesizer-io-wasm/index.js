@@ -11,16 +11,19 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+!async function() {
+    const wasm = await import("./pkg");
 
-const js = import("./pkg/synthesizer_io_wasm");
+    document.getElementById("btn").addEventListener('click', startAudio(wasm));
+}();
 
-function startAudio() {
-    console.log("starting audio");
-    js.then(js => {
-        let synth = js.Synth.new();
-
+function startAudio(wasm) {
+    return function() {
+        console.log("starting audio");
+        let synth = wasm.Synth.new();
+    
         var ctx = new AudioContext();
-
+    
         let scriptNode = ctx.createScriptProcessor(256, 0, 1);
         let bufSize = scriptNode.bufferSize;
         synth.setup_saw(8.781);
@@ -29,8 +32,5 @@ function startAudio() {
             synth.get_samples(obuf);
         };
         scriptNode.connect(ctx.destination);
-
-    });
+    }
 }
-
-document.getElementById("btn").addEventListener('click', startAudio);
