@@ -1,3 +1,4 @@
 target
 node_modules
 synthesizer-io-wasm/pkg
+.DS_Store
